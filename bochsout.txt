@@ -19,7 +19,7 @@
 00000000000i[      ]   Sound support: SB16 ES1370
 00000000000i[      ]   USB support: UHCI OHCI EHCI xHCI
 00000000000i[      ]   VGA extension support: vbe cirrus voodoo
-00000000000i[MEM0  ] allocated memory at 03CA0020. after alignment, vector=03CA1000
+00000000000i[MEM0  ] allocated memory at 03DC0020. after alignment, vector=03DC1000
 00000000000i[MEM0  ] 1024.00MB
 00000000000i[MEM0  ] mem block size = 0x00020000, blocks=8192
 00000000000i[MEM0  ] rom at 0xfffe0000/131072 ('C:\Program Files (x86)\Bochs-2.6.9/BIOS-bochs-latest')
@@ -29,7 +29,7 @@
 00000000000i[DEV   ] PIIX3 PCI-to-ISA bridge present at device 1, function 0
 00000000000i[PLUGIN] init_dev of 'cmos' plugin device by virtual method
 00000000000i[CMOS  ] Using local time for initial clock
-00000000000i[CMOS  ] Setting initial clock to: Tue May 22 16:40:27 2018 (time0=1526978427)
+00000000000i[CMOS  ] Setting initial clock to: Tue May 22 17:39:35 2018 (time0=1526981975)
 00000000000i[PLUGIN] init_dev of 'dma' plugin device by virtual method
 00000000000i[DMA   ] channel 4 used by cascade
 00000000000i[PLUGIN] init_dev of 'pic' plugin device by virtual method
@@ -198,30 +198,30 @@
 00002377221i[BIOS  ] ata0-0: PCHS=16383/16/63 translation=lba LCHS=1024/255/63
 00005824057i[BIOS  ] IDE time out
 00006101610i[BIOS  ] Booting from 0000:7c00
-00007639350i[WINGUI] dimension update x=720 y=400 fontheight=16 fontwidth=9 bpp=8
-00568612047i[BXVGA ] VBE set bpp (24)
-00568612069i[BXVGA ] VBE set xres (1024)
-00568612108i[BXVGA ] VBE set yres (768)
-00568612146i[BXVGA ] VBE enabling x 1024, y 768, bpp 24, 2359296 bytes visible
-00568612146i[WINGUI] dimension update x=1024 y=768 fontheight=0 fontwidth=0 bpp=24
-00718300000p[WINGUI] >>PANIC<< POWER button turned off.
-00718300000i[CPU0  ] CPU is in protected mode (active)
-00718300000i[CPU0  ] CS.mode = 32 bit
-00718300000i[CPU0  ] SS.mode = 32 bit
-00718300000i[CPU0  ] EFER   = 0x00000000
-00718300000i[CPU0  ] | EAX=00000000  EBX=00000002  ECX=00000000  EDX=00406966
-00718300000i[CPU0  ] | ESP=00061e14  EBP=00061e1c  ESI=c0000001  EDI=00000000
-00718300000i[CPU0  ] | IOPL=0 id vip vif ac vm rf nt of df if tf sf ZF af PF cf
-00718300000i[CPU0  ] | SEG sltr(index|ti|rpl)     base    limit G D
-00718300000i[CPU0  ] |  CS:0020( 0004| 0|  0) 00000000 ffffffff 1 1
-00718300000i[CPU0  ] |  DS:0030( 0006| 0|  0) 00000000 ffffffff 1 1
-00718300000i[CPU0  ] |  SS:0030( 0006| 0|  0) 00000000 ffffffff 1 1
-00718300000i[CPU0  ] |  ES:0030( 0006| 0|  0) 00000000 ffffffff 1 1
-00718300000i[CPU0  ] |  FS:0060( 000c| 0|  0) 00023de0 0000ffff 0 0
-00718300000i[CPU0  ] |  GS:0060( 000c| 0|  0) 00023de0 0000ffff 0 0
-00718300000i[CPU0  ] | EIP=00411955 (00411955)
-00718300000i[CPU0  ] | CR0=0x00000011 CR2=0x00000000
-00718300000i[CPU0  ] | CR3=0x00000000 CR4=0x00000000
-00718300000d[PCI   ] Exit
-00718300000i[CMOS  ] Last time is 1526978441 (Tue May 22 16:40:41 2018)
-00718300000i[SIM   ] quit_sim called with exit code 1
+00007545350i[WINGUI] dimension update x=720 y=400 fontheight=16 fontwidth=9 bpp=8
+00359895366i[BXVGA ] VBE set bpp (24)
+00359895388i[BXVGA ] VBE set xres (1024)
+00359895427i[BXVGA ] VBE set yres (768)
+00359895465i[BXVGA ] VBE enabling x 1024, y 768, bpp 24, 2359296 bytes visible
+00359895465i[WINGUI] dimension update x=1024 y=768 fontheight=0 fontwidth=0 bpp=24
+00536550000p[WINGUI] >>PANIC<< POWER button turned off.
+00536550000i[CPU0  ] CPU is in protected mode (active)
+00536550000i[CPU0  ] CS.mode = 16 bit
+00536550000i[CPU0  ] SS.mode = 16 bit
+00536550000i[CPU0  ] EFER   = 0x00000000
+00536550000i[CPU0  ] | EAX=00020060  EBX=00061dbc  ECX=00000002  EDX=00000000
+00536550000i[CPU0  ] | ESP=0000147c  EBP=00000000  ESI=00061dd0  EDI=00000000
+00536550000i[CPU0  ] | IOPL=0 id vip vif ac vm rf nt of df if tf sf zf AF pf cf
+00536550000i[CPU0  ] | SEG sltr(index|ti|rpl)     base    limit G D
+00536550000i[CPU0  ] |  CS:0050( 000a| 0|  0) 00020000 0000ffff 0 0
+00536550000i[CPU0  ] |  DS:0060( 000c| 0|  0) 00023de0 0000ffff 0 0
+00536550000i[CPU0  ] |  SS:0060( 000c| 0|  0) 00023de0 0000ffff 0 0
+00536550000i[CPU0  ] |  ES:0030( 0006| 0|  0) 00000000 ffffffff 1 1
+00536550000i[CPU0  ] |  FS:0060( 000c| 0|  0) 00023de0 0000ffff 0 0
+00536550000i[CPU0  ] |  GS:0060( 000c| 0|  0) 00023de0 0000ffff 0 0
+00536550000i[CPU0  ] | EIP=0000022b (0000022b)
+00536550000i[CPU0  ] | CR0=0x00000011 CR2=0x00000000
+00536550000i[CPU0  ] | CR3=0x00000000 CR4=0x00000000
+00536550000d[PCI   ] Exit
+00536550000i[CMOS  ] Last time is 1526981985 (Tue May 22 17:39:45 2018)
+00536550000i[SIM   ] quit_sim called with exit code 1
