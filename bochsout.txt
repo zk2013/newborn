@@ -19,7 +19,7 @@
 00000000000i[      ]   Sound support: SB16 ES1370
 00000000000i[      ]   USB support: UHCI OHCI EHCI xHCI
 00000000000i[      ]   VGA extension support: vbe cirrus voodoo
-00000000000i[MEM0  ] allocated memory at 03DC0020. after alignment, vector=03DC1000
+00000000000i[MEM0  ] allocated memory at 03EB0020. after alignment, vector=03EB1000
 00000000000i[MEM0  ] 1024.00MB
 00000000000i[MEM0  ] mem block size = 0x00020000, blocks=8192
 00000000000i[MEM0  ] rom at 0xfffe0000/131072 ('C:\Program Files (x86)\Bochs-2.6.9/BIOS-bochs-latest')
@@ -29,7 +29,7 @@
 00000000000i[DEV   ] PIIX3 PCI-to-ISA bridge present at device 1, function 0
 00000000000i[PLUGIN] init_dev of 'cmos' plugin device by virtual method
 00000000000i[CMOS  ] Using local time for initial clock
-00000000000i[CMOS  ] Setting initial clock to: Tue May 22 17:39:35 2018 (time0=1526981975)
+00000000000i[CMOS  ] Setting initial clock to: Wed May 23 17:28:39 2018 (time0=1527067719)
 00000000000i[PLUGIN] init_dev of 'dma' plugin device by virtual method
 00000000000i[DMA   ] channel 4 used by cascade
 00000000000i[PLUGIN] init_dev of 'pic' plugin device by virtual method
@@ -198,30 +198,172 @@
 00002377221i[BIOS  ] ata0-0: PCHS=16383/16/63 translation=lba LCHS=1024/255/63
 00005824057i[BIOS  ] IDE time out
 00006101610i[BIOS  ] Booting from 0000:7c00
-00007545350i[WINGUI] dimension update x=720 y=400 fontheight=16 fontwidth=9 bpp=8
-00359895366i[BXVGA ] VBE set bpp (24)
-00359895388i[BXVGA ] VBE set xres (1024)
-00359895427i[BXVGA ] VBE set yres (768)
-00359895465i[BXVGA ] VBE enabling x 1024, y 768, bpp 24, 2359296 bytes visible
-00359895465i[WINGUI] dimension update x=1024 y=768 fontheight=0 fontwidth=0 bpp=24
-00536550000p[WINGUI] >>PANIC<< POWER button turned off.
-00536550000i[CPU0  ] CPU is in protected mode (active)
-00536550000i[CPU0  ] CS.mode = 16 bit
-00536550000i[CPU0  ] SS.mode = 16 bit
-00536550000i[CPU0  ] EFER   = 0x00000000
-00536550000i[CPU0  ] | EAX=00020060  EBX=00061dbc  ECX=00000002  EDX=00000000
-00536550000i[CPU0  ] | ESP=0000147c  EBP=00000000  ESI=00061dd0  EDI=00000000
-00536550000i[CPU0  ] | IOPL=0 id vip vif ac vm rf nt of df if tf sf zf AF pf cf
-00536550000i[CPU0  ] | SEG sltr(index|ti|rpl)     base    limit G D
-00536550000i[CPU0  ] |  CS:0050( 000a| 0|  0) 00020000 0000ffff 0 0
-00536550000i[CPU0  ] |  DS:0060( 000c| 0|  0) 00023de0 0000ffff 0 0
-00536550000i[CPU0  ] |  SS:0060( 000c| 0|  0) 00023de0 0000ffff 0 0
-00536550000i[CPU0  ] |  ES:0030( 0006| 0|  0) 00000000 ffffffff 1 1
-00536550000i[CPU0  ] |  FS:0060( 000c| 0|  0) 00023de0 0000ffff 0 0
-00536550000i[CPU0  ] |  GS:0060( 000c| 0|  0) 00023de0 0000ffff 0 0
-00536550000i[CPU0  ] | EIP=0000022b (0000022b)
-00536550000i[CPU0  ] | CR0=0x00000011 CR2=0x00000000
-00536550000i[CPU0  ] | CR3=0x00000000 CR4=0x00000000
-00536550000d[PCI   ] Exit
-00536550000i[CMOS  ] Last time is 1526981985 (Tue May 22 17:39:45 2018)
-00536550000i[SIM   ] quit_sim called with exit code 1
+00007628200i[WINGUI] dimension update x=720 y=400 fontheight=16 fontwidth=9 bpp=8
+00466999804i[BXVGA ] VBE set bpp (24)
+00466999826i[BXVGA ] VBE set xres (1024)
+00466999865i[BXVGA ] VBE set yres (768)
+00466999903i[BXVGA ] VBE enabling x 1024, y 768, bpp 24, 2359296 bytes visible
+00466999903i[WINGUI] dimension update x=1024 y=768 fontheight=0 fontwidth=0 bpp=24
+00971520851i[BIOS  ] int13_diskette: unsupported AH=41
+02421418730i[APIC0 ] set timer divide factor to 1
+02421430663e[CPU0  ] RDMSR: Unknown register 0x1a0
+02421430673e[CPU0  ] WRMSR: Unknown register 0x1a0
+02421431119e[CPU0  ] WRMSR: Unknown register 0x8b
+02421431149e[CPU0  ] RDMSR: Unknown register 0x8b
+02421439583e[CPU0  ] RDMSR: Unknown register 0x17
+02421439623e[CPU0  ] WRMSR: Unknown register 0x8b
+02421439683e[CPU0  ] RDMSR: Unknown register 0x8b
+02421451070e[CPU0  ] WRMSR: Unknown register 0x79
+02421451095e[CPU0  ] WRMSR: Unknown register 0x8b
+02421451155e[CPU0  ] RDMSR: Unknown register 0x8b
+02421451208e[CPU0  ] WRMSR: Unknown register 0x8b
+02421451268e[CPU0  ] RDMSR: Unknown register 0x8b
+02421489875i[CPU0  ] WRMSR: write 0x0000000000000000 to MSR_TSC
+02427741881i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+02427741885i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+02427743705i[IOAPIC] IOAPIC: setting id to 0x1
+02427744175i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+02427744179i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+02427744345i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+02427744349i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+02427744758i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+02427744762i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03253275650e[CPU0  ] RDMSR: Unknown register 0x1a0
+03253275661e[CPU0  ] WRMSR: Unknown register 0x1a0
+03521841881e[CPU0  ] RDMSR: Unknown register 0x179
+03521849562e[CPU0  ] RDMSR: Unknown register 0x179
+03545999836i[CPU0  ] Enter to System Management Mode
+03545999836i[CPU0  ] enter_system_management_mode: temporary disable VMX while in SMM mode
+03545999846i[CPU0  ] RSM: Resuming from System Management Mode
+03547768907i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03547768911i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03548177948i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03548177952i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03552599234i[P2ISA ] PCI IRQ routing: PIRQA# set to 0x8b
+03552610871i[P2ISA ] PCI IRQ routing: PIRQB# set to 0x89
+03552624865i[P2ISA ] PCI IRQ routing: PIRQC# set to 0x8b
+03552636148i[P2ISA ] PCI IRQ routing: PIRQD# set to 0x89
+03581234619i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03581234623i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03602310228i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03602310232i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03602784862i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03602784866i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03603457863i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03603457867i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03604149066i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03604149070i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+03679386111i[HD    ] ata0-0: set transfer mode to PIO
+03679386711i[HD    ] ata0-0: set transfer mode to MDMA2
+03727730611i[HD    ] ata0-0: SET FEATURES subcommand 0x66 not supported, but returning success
+03727733995e[HD    ] write cmd 0xF5 (SECURITY FREEZE LOCK) not supported
+03727737227i[HD    ] ata0-0: SET FEATURES subcommand 0x02 not supported, but returning success
+03889315303e[CPU0  ] RDMSR: Unknown register 0x179
+03889334946e[CPU0  ] RDMSR: Unknown register 0x179
+04667395125i[CPU0  ] WARNING: Architectural Performance Monitoring is not implemented
+04667396309e[CPU0  ] RDMSR: Unknown register 0x17
+04667396558e[CPU0  ] WRMSR: Unknown register 0x8b
+04667396586e[CPU0  ] RDMSR: Unknown register 0x8b
+04667401742e[CPU0  ] RDMSR: Unknown register 0x19a
+04667402009e[CPU0  ] RDMSR: Unknown register 0x19b
+04667402276e[CPU0  ] RDMSR: Unknown register 0x19c
+04667402545e[CPU0  ] RDMSR: Unknown register 0x19d
+04667402811e[CPU0  ] RDMSR: Unknown register 0x1a0
+04745538085i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04745538089i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04876387348i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04876387352i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04877007944i[P2ISA ] PCI IRQ routing: PIRQD# set to 0x05
+04877018909i[UHCI  ] new irq line = 5
+04877484714i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04877484718i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04878082790i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04878082794i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04878666934i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04878666938i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04879249063i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04879249067i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04879840488i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04879840492i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04886583997i[KBD   ] keyboard: scan convert turned off
+04886590122i[KBD   ] setting typematic info
+04886602887i[KBD   ] setting delay to 250 mS (unused)
+04886602887i[KBD   ] setting repeat rate to 30.0 cps (unused)
+04886671528i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04886671532i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04886678852i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04886678856i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04886779985i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04886779989i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04886793757i[FLOPPY] controller reset in software
+04886797805e[FLOPPY] io_write: 0x3f5: invalid floppy command 0x18
+04886798125i[FLOPPY] perpendicular mode: config=0x80
+04886798320e[FLOPPY] io_write: 0x3f5: invalid floppy command 0x18
+04886798994i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04886798998i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04900780531i[SER   ] com1: FIFO enabled
+04900780572i[SER   ] com1: FIFO enabled
+04900785444i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04900785448i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04900786232i[SER   ] com1: FIFO enabled
+04905236727i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04905236731i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04907694767i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04907694771i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+04909873959i[SER   ] com1: FIFO enabled
+04909876850i[SER   ] com1: FIFO enabled
+04909879311i[SER   ] com1: FIFO enabled
+05054073103i[CPU0  ] WARNING: Architectural Performance Monitoring is not implemented
+05054074287e[CPU0  ] RDMSR: Unknown register 0x17
+05054074536e[CPU0  ] WRMSR: Unknown register 0x8b
+05054074564e[CPU0  ] RDMSR: Unknown register 0x8b
+05054076741e[CPU0  ] RDMSR: Unknown register 0x19a
+05054077008e[CPU0  ] RDMSR: Unknown register 0x19b
+05054077275e[CPU0  ] RDMSR: Unknown register 0x19c
+05054077544e[CPU0  ] RDMSR: Unknown register 0x19d
+05054077810e[CPU0  ] RDMSR: Unknown register 0x1a0
+05077947427i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+05077947431i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+05080269878i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+05080269882i[IOAPIC] IOAPIC: could not write, IOREGSEL=0x01
+05107477167i[SER   ] com1: FIFO enabled
+05965315873i[BXVGA ] VBE disabling
+05965325888i[BXVGA ] VBE set bpp (32)
+05965330278i[BXVGA ] VBE set xres (800)
+05965338269i[BXVGA ] VBE set yres (600)
+05965345700i[BXVGA ] VBE enabling x 800, y 600, bpp 32, 1920000 bytes visible
+05965345700i[WINGUI] dimension update x=800 y=600 fontheight=0 fontwidth=0 bpp=32
+06170858639i[KBD   ] setting typematic info
+06170877164i[KBD   ] setting delay to 250 mS (unused)
+06170877164i[KBD   ] setting repeat rate to 15.0 cps (unused)
+06211207512i[KBD   ] setting typematic info
+06211227184i[KBD   ] setting delay to 500 mS (unused)
+06211227184i[KBD   ] setting repeat rate to 30.0 cps (unused)
+06888722558e[CPU0  ] RDMSR: Unknown register 0x179
+09955742621e[CPU0  ] RDMSR: Unknown register 0x179
+12888685513e[CPU0  ] RDMSR: Unknown register 0x179
+13984785557i[KBD   ] setting typematic info
+13984802152i[KBD   ] setting delay to 500 mS (unused)
+13984802152i[KBD   ] setting repeat rate to 30.0 cps (unused)
+15888686087e[CPU0  ] RDMSR: Unknown register 0x179
+17437750000p[WINGUI] >>PANIC<< POWER button turned off.
+17437750000i[CPU0  ] CPU is in protected mode (active)
+17437750000i[CPU0  ] CS.mode = 32 bit
+17437750000i[CPU0  ] SS.mode = 32 bit
+17437750000i[CPU0  ] EFER   = 0x00000800
+17437750000i[CPU0  ] | EAX=0014dd2c  EBX=024477c0  ECX=0244be00  EDX=0014dd50
+17437750000i[CPU0  ] | ESP=0014dd2c  EBP=0014dde0  ESI=02446f14  EDI=000001b0
+17437750000i[CPU0  ] | IOPL=0 id vip vif ac vm rf nt of df IF tf sf ZF af PF cf
+17437750000i[CPU0  ] | SEG sltr(index|ti|rpl)     base    limit G D
+17437750000i[CPU0  ] |  CS:001b( 0003| 0|  3) 00000000 ffffffff 1 1
+17437750000i[CPU0  ] |  DS:0023( 0004| 0|  3) 00000000 ffffffff 1 1
+17437750000i[CPU0  ] |  SS:0023( 0004| 0|  3) 00000000 ffffffff 1 1
+17437750000i[CPU0  ] |  ES:0023( 0004| 0|  3) 00000000 ffffffff 1 1
+17437750000i[CPU0  ] |  FS:003b( 0007| 0|  3) 7ffdf000 00000fff 0 1
+17437750000i[CPU0  ] |  GS:0000( 0000| 0|  0) 00000000 00000000 0 0
+17437750000i[CPU0  ] | EIP=74625381 (74625381)
+17437750000i[CPU0  ] | CR0=0x80010031 CR2=0x8c676400
+17437750000i[CPU0  ] | CR3=0x3edcd220 CR4=0x000406f9
+17437750000d[PCI   ] Exit
+17437750000i[CMOS  ] Last time is 1527068067 (Wed May 23 17:34:27 2018)
+17437750000i[SIM   ] quit_sim called with exit code 1
