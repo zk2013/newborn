@@ -54,4 +54,5 @@ dkms.conf
 # bin and lst file
 *.bin
 *.lst
+bochsout.txt
 

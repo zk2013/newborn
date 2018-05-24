@@ -111,7 +111,7 @@ read_handler:
 
     ; now scan the read buffer for a signature in bootmgr
     ;   + 8A 46 ?? 98 3D 00 00 75 03 E9 03 00 E9 35 00
-    ;     Windows Vista bootmgr at address 06F2h
+    ;     Windows Vista/7 bootmgr at address 06F2h
     ; patch applied: hooking code to call protected mode part
     ;   000205ec:  mov al, byte ptr ss:[bp+0xfff6]  ; 8a46f6    ->    call far 0020:0009f5c4    ; 669ac4f509002000
     ;   000205ef:  cbw                              ; 98        ->    
@@ -189,6 +189,7 @@ ret
 ; protected code start called by bootmgr SU module
 [bits 32]
 Entry_Point_OS_Vista:
+
 pushad
 push es
 push ds
