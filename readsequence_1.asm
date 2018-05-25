@@ -106,8 +106,8 @@ read_handler:
     cld
 
     ; skip scan if bootmgr already patched.
-    test [cs:Configuration_Bits],byte 00001000b 
-    jnz bootmgr_already_patched
+    ;test [cs:Configuration_Bits],byte 00001000b 
+    ;jnz bootmgr_already_patched
 
     ; now scan the read buffer for a signature in bootmgr
     ;   + 8A 46 ?? 98 3D 00 00 75 03 E9 03 00 E9 35 00
@@ -189,7 +189,10 @@ ret
 ; protected code start called by bootmgr SU module
 [bits 32]
 Entry_Point_OS_Vista:
-
+nop
+nop
+nop
+nop
 pushad
 push es
 push ds
