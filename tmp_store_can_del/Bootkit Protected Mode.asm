@@ -219,7 +219,7 @@ retf                                                                            
 
 
 
-
+; FakeImgpLoadPEImage
 Windows_Vista_NtKernel_Hook_Code:
 
 ; 1. called by OSLOADER resisting in bootmgr
@@ -349,7 +349,7 @@ push ecx
 push edi
 
 ; scan ntoskrnl.exe for code patterns [+ for Vista]:
-;   + 6A 4B/19 6A 19/4B /?? ?? ?? ?? 89/ ??/ ??/ ??/ ??/ ??/ ??/ E8
+;   +  6A 4B 6A 19 / 6A 19 6A 4B
 ;     ntoskrnl.1CE87E0h
 ;			memory.0x80683ec9
 Scan_Pattern_Ntoskrnl:

