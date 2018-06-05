@@ -99,6 +99,7 @@ call dword Obfuscation_Call
 
 
 ; standard API hashes (all of ntoskrnl)
+; [ebp - 28]   PsLoadedModuleList
 ExAllocatePool    dd    03707E062h  ; ebp-24
 ExFrePool         dd    09D489D1Fh  ; ebp-20
 KeLoaderBlock     dd    03E7DC5A8h  ; ebp-16 (unused)

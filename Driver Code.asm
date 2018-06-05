@@ -91,11 +91,7 @@ popad
 ; no no no...
 ret                                                                             ;  :(
 
-
-
-
-
-
+ 
 Load_Execute_Driver:
 
 ; Input
