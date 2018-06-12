@@ -56,3 +56,14 @@ dkms.conf
 #*.lst
 bochsout.txt
 
+bootkit0_2_7c00_2.bin
+bootkit0_2_7c00_2.lst
+bootkit_all.bin
+bx_enh_dbg.ini
+reverse/win7sp1_32bit/ntkrnlpa.id0
+reverse/win7sp1_32bit/ntkrnlpa.id1
+reverse/win7sp1_32bit/ntkrnlpa.id2
+reverse/win7sp1_32bit/ntkrnlpa.nam
+reverse/win7sp1_32bit/ntkrnlpa.til
+bootkit0_2_7c00_2.bin
+bootkit0_2_7c00_2.lst
