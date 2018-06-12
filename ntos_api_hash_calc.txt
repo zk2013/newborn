@@ -1,0 +1,19 @@
+int   __declspec(naked) hasj_calc(char* str) {
+	 
+	__asm {
+			mov esi, [esp+4]
+			xor eax, eax
+			xor edi, edi
+
+			Generate_Hash_of_Export_Name:
+			lodsb
+			or al, al; zero termination ?
+			jz Hash_Generated
+			ror edi, 13; >> 13 is used(as in previous Sinowal version!)
+			add edi, eax; add to hash value
+			jmp Generate_Hash_of_Export_Name
+			Hash_Generated:
+			mov eax, edi
+			ret 4
+	}
+}
