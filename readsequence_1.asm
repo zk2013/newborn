@@ -393,7 +393,7 @@ jnz Search_Unknown_Signature
 cmp byte [edi+0x10],0x8B
 jnz Search_Unknown_Signature
 
-; backup 6 bytes to overwrite them with custom code
+; backup 10 bytes to overwrite them with custom code
 ; break in 0x9edf5
 dec edi                                                                         ; -1 to get to start of signature
 mov eax,[edi]                                                                   ; copy 4 bytes
@@ -440,6 +440,11 @@ ret
 Relocate_Me_Code:
 nop
 nop
+nop
+nop
+nop
+nop
+
 nop
 nop
 nop
