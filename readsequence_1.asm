@@ -132,6 +132,8 @@ read_handler:
     cmp dword [es:di+10],0035E900h
     jnz Search_Signature_3
 
+    ; in win7sp1_x32 this will execute twice
+    ; but in win8.1_x64 will only execute  once
     ; apply patch:
     ;   + 66 9A ADDRESS 20 90
     Found_Signature_bootmgr:
@@ -366,19 +368,29 @@ Hook_WinloadExe:
 push ecx
 push edi
 
-; scan winload for some jump offset in _ImgpLoadPEImage@36  
-;   + 3B ?? 58 74 ?? C7
-; patch applied: winload.exe will be hooked
-;   0041e8c0:  cmp eax, dword ptr ds:[ebx+0x58]         ; 3b4358            ->      call [address]
-;   0041e8c3:  jz .+0x0000000c                          ; 740c              ->
-;   0041e8c5:  mov dword ptr ss:[ebp+0x8], 0xc0000221   ; c74508210200c0    (STATUS_IMAGE_CHECKSUM_MISMATCH)
+; scan bootmgr!bootmgr.exe for _ImgArchPcatLoadBootApplication@28
+; _text:0041C016 E8 EB 54 00 00                          call    _ImgArchPcatLoadBootApplication@28 ; ImgArchPcatLoadBootApplication(x,x,x,x,x,x,x)
+; _text:0041C01B 8B F0                                   mov     esi, eax
+; _text:0041C01D                         ; 110:       if ( v9 < 0 )
+; _text:0041C01D 85 F6                                   test    esi, esi
+; _text:0041C01F 0F 88 86 01 00 00                       js      loc_41C1AB
+; _text:0041C025                         ; 115:       v4 = v30;
+; _text:0041C025 83 3D 8C 44 4B 00 00                    cmp     _BdDebugTransitions, 0
+; _text:0041C02C 8B 7C 24 1C                             mov     edi, [esp+0D0h+var_B4]
+
+; 8B F0 85 F6 0F 88 ?? ?? ?? ?? 83 3D ?? ?? ?? ?? ?? 8B
+
 Search_Unknown_Signature:
-mov al,0x3b
+mov al,0x8B
 repne scasb
 jnz Hook_WinloadExe_Exit
-cmp word [edi+0x1],0x7458
+cmp dword [edi-0x1],0xF685F08B
 jnz Search_Unknown_Signature
-cmp byte [edi+0x4],0xC7
+cmp word [edi+0x3],0x880F
+jnz Search_Unknown_Signature
+cmp word [edi+0x9],0x3D83
+jnz Search_Unknown_Signature
+cmp byte [edi+0x10],0x8B
 jnz Search_Unknown_Signature
 
 ; backup 6 bytes to overwrite them with custom code
