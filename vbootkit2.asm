@@ -538,7 +538,7 @@ mov rdi,rdx
 
 ;This is the entrypoint , currently it's hard coded, bit resolve it and put code to find it out
 ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-sub rdi, 0x2C0950  ; now RSI , contains base of kernel'
+sub rdi, 0x2C0950  ; now rdi , contains base of kernel'
 
 mov rdx,rdi
 ; store kernel base for future

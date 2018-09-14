@@ -16,7 +16,7 @@
     16                                  
     17                                  ; now copy this boot application to the end of memory (by default 4 KB size, the reserved size)
     18 00000010 BE007E                  mov si,7e00h
-    19 00000013 66B9[72030000]          mov ecx,Total_End_of_Binary
+    19 00000013 66B9[3C040000]          mov ecx,Total_End_of_Binary
     20 00000019 F3A4                    rep movsb
     21                                  
     22                                  ; backup old int 13h vector
@@ -519,17 +519,111 @@
    504 00000361 51                      push rcx
    505 00000362 57                      push rdi
    506                                  
-   507                                  Hook_NtosKerenelImage_Exit:
-   508 00000363 5F                      pop rdi
-   509 00000364 59                      pop rcx
-   510 00000365 C3                      ret
-   511                                  
-   512                                  ; data following, [ebp - 32] will point to here
-   513                                  Data_Reference:
-   514                                  Subsystem_Variables:
-   515 00000366 00000000                Ntoskrnl_BaseAddress        dd  0
-   516 0000036A 00000000                Callback_NotifyDriverLoad   dd  0
-   517 0000036E 00000000                Memory_Pool                 dd  0
-   518                                  
-   519                                  Total_End_of_Binary:
-   520 00000372 00<rept>                times 4*1024-($-$$) db 0
+   507                                  ; 48 8B CB E8 ?? ?? ?? ?? 84 C0 74 ?? 40 8A D7
+   508                                  ; PAGE:00000001404F406A 48 8B CB                                mov     rcx, rbx
+   509                                  ; PAGE:00000001404F406D E8 6E FE 20 00                          call    IoInitSystem
+   510                                  ; PAGE:00000001404F4072 84 C0                                   test    al, al
+   511                                  ; PAGE:00000001404F4074 74 1C                                   jz      short loc_1404F4092
+   512                                  ; PAGE:00000001404F4076 40 8A D7                                mov     dl, dil
+   513                                  
+   514                                  Search_Ntoskernel_Signature:
+   515 00000363 B048                    mov al,0x48
+   516 00000365 F2AE                    repne scasb
+   517 00000367 0F85B3000000            jnz Hook_NtosKerenelImage_Exit
+   518 0000036D 817FFF488BCBE8          cmp dword [rdi-0x1],0xE8CB8B48
+   519 00000374 75ED                    jnz Search_Ntoskernel_Signature
+   520 00000376 66817F0784C0            cmp word [rdi + 0x7],0xC084
+   521 0000037C 75E5                    jnz Search_Ntoskernel_Signature
+   522 0000037E 807F0974                cmp byte [rdi + 0x9],0x74
+   523 00000382 75DF                    jnz Search_Ntoskernel_Signature
+   524 00000384 66817F0B408A            cmp word [rdi + 0xb],0x8A40
+   525 0000038A 75D7                    jnz Search_Ntoskernel_Signature
+   526 0000038C 807F0DD7                cmp byte [rdi + 0xd],0xD7
+   527 00000390 75D1                    jnz Search_Ntoskernel_Signature
+   528                                  ; move to  call    IoInitSystem
+   529 00000392 4883C702                add rdi,2
+   530                                  
+   531                                  ; foud signature, begin patch
+   532                                  ; set a flag bit  indicate  we already patch ntoskernel.exe
+   533 00000396 834E0801                or  dword  [rsi + 8], 0x1
+   534                                  
+   535                                  ; move code ntoskernel code gap
+   536                                  ; section va         size
+   537                                  ; POOLCODE 002A3000  000028A7
+   538 0000039A 57                      push rdi
+   539 0000039B 488B7C2408              mov rdi,[rsp+0x8] ; rdi  <-- imagebase of ntoskernel.exe
+   540 000003A0 4881C700302A00          add rdi,0x2A3000
+   541 000003A7 4881C7A7280000          add rdi,0x28A7
+   542                                  
+   543 000003AE 56                      push rsi
+   544 000003AF 4881C686010000          add rsi,springboard-Relocate_Me_Code
+   545 000003B6 B919000000              mov rcx,Total_End_of_Binary - springboard
+   546 000003BB F3A4                    rep movsb
+   547 000003BD 5E                      pop rsi
+   548                                  
+   549                                  ; now code in ntoskernel gap, do patch
+   550 000003BE 5F                      pop rdi
+   551 000003BF 488B1C24                mov rbx,[rsp] ; rbx  <-- imagebase of ntoskernel.exe
+   552 000003C3 4881C300302A00          add rbx,0x2A3000
+   553 000003CA 4881C3A7280000          add rbx,0x28A7 ; rbx <-- code gap begin springboard in gas
+   554                                  
+   555 000003D1 53                      push rbx
+   556 000003D2 4889DA                  mov rdx, rbx
+   557 000003D5 4883C208                add rdx,instruction_jmp_back-springboard ; rdx <--  jmp_back in gas
+   558 000003D9 5B                      pop rbx
+   559                                  
+   560 000003DA 8B4701                  mov eax,dword [rdi + 0x1]
+   561 000003DD 4883E0FF                and rax,0xffffffff
+   561          ******************       warning: signed dword value exceeds bounds
+   562 000003E1 488D4F05                lea rcx,[rdi + 0x5]
+   563 000003E5 4801C1                  add rcx,rax ;rcx  <--  address of IoInitSystem
+   564                                  
+   565                                  ; change call    IoInitSystem to jmp springboard
+   566 000003E8 C607E9                  mov byte [rdi], 0xe9
+   567 000003EB 53                      push rbx
+   568 000003EC 4829FB                  sub rbx,rdi
+   569 000003EF 4883EB05                sub rbx,5
+   570 000003F3 895F01                  mov dword [rdi + 0x1],ebx
+   571 000003F6 5B                      pop rbx
+   572                                  
+   573                                  ; fix  instruction_jmp_back
+   574 000003F7 4883C705                add rdi,5 ; <-- now rdi is origin  call IoInitSystem ret addr.
+   575 000003FB 4829D7                  sub rdi,rdx
+   576 000003FE 4883EF05                sub rdi,5
+   577 00000402 897A01                  mov dword [rdx + 0x1], edi
+   578                                  
+   579                                  ; fix  instruction_call_io_init_system
+   580 00000405 4829D9                  sub rcx, rbx
+   581 00000408 4883E905                sub rcx,5
+   582 0000040C 894B01                  mov dword [rbx + 0x1],ecx
+   583                                  
+   584                                  ; save  ntoskerenel image base
+   585 0000040F 56                      push rsi
+   586 00000410 4881C693010000          add rsi,Ntoskrnl_BaseAddress-Relocate_Me_Code
+   587 00000417 488B442408              mov rax,[rsp + 0x8]
+   588 0000041C 488906                  mov [rsi], rax
+   589 0000041F 5E                      pop rsi
+   590                                  
+   591                                  Hook_NtosKerenelImage_Exit:
+   592 00000420 5F                      pop rdi
+   593 00000421 59                      pop rcx
+   594 00000422 C3                      ret
+   595                                  
+   596                                  springboard:
+   597                                  ; call IoInitSystem
+   598 00000423 E800000000              instruction_call_io_init_system db 0xe8,0x0,0x0,0x0,0x0
+   599                                  handler_after_io_init_system_ret:
+   600 00000428 90                      nop
+   601 00000429 90                      nop
+   602 0000042A 90                      nop
+   603 0000042B E900000000              instruction_jmp_back db 0xe9,0x0,0x0,0x0,0x0
+   604                                  
+   605                                  ; data following, [ebp - 32] will point to here
+   606                                  Data_Reference:
+   607                                  Subsystem_Variables:
+   608 00000430 00000000                Ntoskrnl_BaseAddress        dd  0
+   609 00000434 00000000                Callback_NotifyDriverLoad   dd  0
+   610 00000438 00000000                Memory_Pool                 dd  0
+   611                                  
+   612                                  Total_End_of_Binary:
+   613 0000043C 00<rept>                times 4*1024-($-$$) db 0

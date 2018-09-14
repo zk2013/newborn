@@ -856,10 +856,10 @@ debugger_log: debugger.out
 #   com3: enabled=1, mode=raw, dev=com1
 #   com3: enabled=1, mode=socket-client, dev=localhost:8888
 #   com3: enabled=1, mode=socket-server, dev=localhost:8888
-#   com4: enabled=1, mode=pipe-client, dev=\\.\pipe\mypipe
-#   com4: enabled=1, mode=pipe-server, dev=\\.\pipe\mypipe
+#  com1: enabled=1, mode=pipe-client, dev=\\.\pipe\mypipe
+# com1: enabled=1, mode=pipe-server, dev=\\.\pipe\mypipe
 #=======================================================================
-#com1: enabled=1, mode=term, dev=/dev/ttyp9
+# com1: enabled=1, mode=term, dev=/dev/ttyp9
 
 
 #=======================================================================

